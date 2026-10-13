@@ -60,6 +60,24 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', service: 'ticketx-server' });
 });
 
+// Which build and demo settings are running (no secrets)
+app.get('/api/version', async (req, res) => {
+  // eslint-disable-next-line global-require
+  const mongoose = require('mongoose');
+  let seed = null;
+  try {
+    seed = mongoose.connection.db ? await mongoose.connection.db.collection('meta').findOne({ _id: 'seed' }) : null;
+  } catch (e) {
+    seed = { error: e.message };
+  }
+  res.json({
+    commit: process.env.RENDER_GIT_COMMIT ? process.env.RENDER_GIT_COMMIT.slice(0, 7) : 'local',
+    demoMode: process.env.DEMO_MODE === 'true',
+    seedOnStart: process.env.SEED_ON_START === 'true',
+    seed,
+  });
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/admin', adminRoutes);
