@@ -32,7 +32,8 @@ function esc(value) {
     .replace(/'/g, '&#39;');
 }
 
-const CLIENT_URL = () => process.env.CLIENT_URL || 'http://localhost:5173';
+// Render sets RENDER_EXTERNAL_URL to the service's public https URL
+const CLIENT_URL = () => process.env.CLIENT_URL || process.env.RENDER_EXTERNAL_URL || 'http://localhost:5173';
 
 async function send(message, label) {
   if (!emailEnabled()) {

@@ -130,6 +130,16 @@ npm install
 npm run dev       # http://localhost:5173
 ```
 
+### Option C: Free live demo (Render + MongoDB Atlas)
+
+The repo deploys as **one** web service: Express serves the API, Socket.IO and the built React app from the same URL. `render.yaml` describes it.
+
+1. **Database:** create a free **M0** cluster on [MongoDB Atlas](https://www.mongodb.com/cloud/atlas/register). Add a database user, allow network access from `0.0.0.0/0` (Render has no fixed IP on the free tier), and copy the connection string. Add the database name before the `?`, e.g. `mongodb+srv://user:pass@cluster0.xxxxx.mongodb.net/ticketx?retryWrites=true&w=majority`. Atlas clusters are replica sets, so transactions work.
+2. **App:** on [Render](https://render.com), choose **New → Blueprint**, pick this GitHub repo, paste the Atlas string as `MONGO_URI`, leave `SMTP_USER` / `SMTP_PASS` empty (or add Mailtrap credentials), and create it.
+3. The first build takes a few minutes. Demo data is seeded on first start. Open `https://<your-service>.onrender.com`.
+
+Live-demo behaviour (`DEMO_MODE=true`): demo accounts can't be blocked, and the data resets to the seed state at most once every `DEMO_RESET_HOURS` (24), on the next start. Free Render services sleep after 15 minutes without traffic and take about a minute to wake, so open the link once before showing it to someone.
+
 ### Email (optional)
 
 Without SMTP credentials, emails are skipped and logged. To see real emails, create a free [Mailtrap](https://mailtrap.io) inbox and set `SMTP_USER` / `SMTP_PASS` in `server/.env` (or export them before `docker compose up`).

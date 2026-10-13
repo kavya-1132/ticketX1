@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
 const cors = require('cors');
 const rateLimit = require('express-rate-limit');
@@ -72,6 +74,17 @@ app.use('/api/bookings', bookingRoutes);
 app.use('/api/waitlist', waitlistRoutes);
 app.use('/api/tickets', ticketRoutes);
 app.use('/api/organiser', organiserRoutes);
+
+// Single-service deployment: serve the built React app (client/dist) from the same origin,
+// so the live demo is one URL with no CORS and Socket.IO on the same host.
+const clientDist = path.resolve(__dirname, '../../client/dist');
+if (!isTest && fs.existsSync(path.join(clientDist, 'index.html'))) {
+  app.use(express.static(clientDist, { index: false, maxAge: '1h' }));
+  // Any non-API GET goes to the React router
+  app.get(/^\/(?!api\/|socket\.io\/).*/, (req, res) => {
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
+}
 
 // 404 Route handler
 app.use((req, res) => {

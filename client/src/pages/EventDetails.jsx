@@ -19,7 +19,7 @@ import {
   Hourglass,
 } from 'lucide-react';
 
-const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
+const SOCKET_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:5000' : '');
 
 export default function EventDetails() {
   const { id: eventId } = useParams();
@@ -84,7 +84,7 @@ export default function EventDetails() {
 
   // Socket.IO real-time subscription
   useEffect(() => {
-    const socket = io(SOCKET_URL, {
+    const socket = io(SOCKET_URL || undefined, {
       transports: ['websocket', 'polling'],
       withCredentials: true,
     });

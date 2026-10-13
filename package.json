@@ -1,0 +1,14 @@
+{
+  "name": "ticketx",
+  "version": "1.0.0",
+  "private": true,
+  "description": "TicketX - movie and concert booking without double-booking (single-service deploy: API + built React app)",
+  "scripts": {
+    "build": "npm ci --prefix server --omit=dev && npm ci --prefix client --include=dev && npm run build --prefix client",
+    "start": "node server/src/server.js",
+    "test": "npm test --prefix server"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

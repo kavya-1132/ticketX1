@@ -3,6 +3,9 @@ const User = require('../models/User');
 const Event = require('../models/Event');
 const Booking = require('../models/Booking');
 const WaitlistEntry = require('../models/WaitlistEntry');
+const { SEED_USERS } = require('../utils/seed');
+
+const SEED_EMAILS = new Set(SEED_USERS.map((u) => u.email.toLowerCase()));
 const { auth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -45,6 +48,11 @@ router.patch('/users/:id/block', async (req, res, next) => {
 
     if (user.role === 'admin') {
       return res.status(400).json({ error: 'Cannot block an admin user' });
+    }
+
+    // On the public live demo, keep the shared demo accounts usable for every visitor
+    if (process.env.DEMO_MODE === 'true' && SEED_EMAILS.has(user.email)) {
+      return res.status(403).json({ error: 'Demo accounts cannot be blocked on the live demo' });
     }
 
     user.isBlocked = typeof isBlocked === 'boolean' ? isBlocked : !user.isBlocked;
