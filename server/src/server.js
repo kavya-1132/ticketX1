@@ -28,6 +28,18 @@ setupSeatSockets(io);
 async function startServer() {
   try {
     await connectDB();
+
+    // Docker convenience: seed demo data on first boot only (never wipes an existing database)
+    if (process.env.SEED_ON_START === 'true') {
+      // eslint-disable-next-line global-require
+      const User = require('./models/User');
+      if ((await User.estimatedDocumentCount()) === 0) {
+        // eslint-disable-next-line global-require
+        const { seedUsers } = require('./utils/seed');
+        await seedUsers();
+      }
+    }
+
     server.listen(PORT, () => {
       // eslint-disable-next-line no-console
       console.log(`[TicketX Server] Running on http://localhost:${PORT}`);

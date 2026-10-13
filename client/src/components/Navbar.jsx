@@ -41,6 +41,13 @@ export default function Navbar() {
               Events
             </Link>
 
+            {isAuthenticated && user?.role === 'customer' && (
+              <Link to="/my-tickets" className="text-slate-300 hover:text-white transition-colors flex items-center gap-1.5">
+                <Ticket className="w-4 h-4 text-indigo-400" />
+                My Tickets
+              </Link>
+            )}
+
             {isAuthenticated && user?.role === 'admin' && (
               <Link
                 to="/admin"

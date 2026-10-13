@@ -11,6 +11,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import EventsList from './pages/EventsList';
 import EventDetails from './pages/EventDetails';
 import OrganiserDashboard from './pages/OrganiserDashboard';
+import MyTickets from './pages/MyTickets';
 
 function NotFound() {
   return (
@@ -41,6 +42,14 @@ export default function App() {
               <Route path="/register" element={<Register />} />
               <Route path="/events" element={<EventsList />} />
               <Route path="/events/:id" element={<EventDetails />} />
+              <Route
+                path="/my-tickets"
+                element={
+                  <ProtectedRoute allowedRoles={['customer']}>
+                    <MyTickets />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/organiser"
                 element={

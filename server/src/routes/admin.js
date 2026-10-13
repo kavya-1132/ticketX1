@@ -1,5 +1,8 @@
 const express = require('express');
 const User = require('../models/User');
+const Event = require('../models/Event');
+const Booking = require('../models/Booking');
+const WaitlistEntry = require('../models/WaitlistEntry');
 const { auth, requireRole } = require('../middleware/auth');
 
 const router = express.Router();
@@ -68,6 +71,26 @@ router.get('/stats', async (req, res, next) => {
     const adminCount = await User.countDocuments({ role: 'admin' });
     const blockedCount = await User.countDocuments({ isBlocked: true });
 
+    const [eventCount, confirmedBookings, cancelledBookings, waitingCount, revenueAgg, topEvents] = await Promise.all([
+      Event.countDocuments(),
+      Booking.countDocuments({ status: 'confirmed' }),
+      Booking.countDocuments({ status: 'cancelled' }),
+      WaitlistEntry.countDocuments({ status: { $in: ['waiting', 'offered'] } }),
+      Booking.aggregate([
+        { $match: { status: 'confirmed' } },
+        { $group: { _id: null, revenue: { $sum: '$total' }, tickets: { $sum: { $size: '$seatIds' } } } },
+      ]),
+      Booking.aggregate([
+        { $match: { status: 'confirmed' } },
+        { $group: { _id: '$eventId', revenue: { $sum: '$total' }, tickets: { $sum: { $size: '$seatIds' } } } },
+        { $sort: { revenue: -1 } },
+        { $limit: 5 },
+        { $lookup: { from: 'events', localField: '_id', foreignField: '_id', as: 'event' } },
+        { $unwind: { path: '$event', preserveNullAndEmptyArrays: true } },
+        { $project: { _id: 0, eventId: '$_id', title: '$event.title', revenue: 1, tickets: 1 } },
+      ]),
+    ]);
+
     return res.status(200).json({
       stats: {
         totalUsers,
@@ -75,6 +98,13 @@ router.get('/stats', async (req, res, next) => {
         organiserCount,
         adminCount,
         blockedCount,
+        eventCount,
+        confirmedBookings,
+        cancelledBookings,
+        ticketsSold: revenueAgg[0] ? revenueAgg[0].tickets : 0,
+        revenue: revenueAgg[0] ? revenueAgg[0].revenue : 0,
+        waitlistActive: waitingCount,
+        topEvents,
       },
     });
   } catch (error) {

@@ -105,6 +105,61 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* Sales Row */}
+      {stats && (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-2 gap-4 lg:col-span-1">
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
+              <span className="text-xs text-slate-400 font-medium">Revenue</span>
+              <p className="text-2xl font-extrabold text-emerald-400 mt-1">${stats.revenue ?? 0}</p>
+            </div>
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
+              <span className="text-xs text-slate-400 font-medium">Tickets sold</span>
+              <p className="text-2xl font-extrabold text-white mt-1">{stats.ticketsSold ?? 0}</p>
+            </div>
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
+              <span className="text-xs text-slate-400 font-medium">Bookings</span>
+              <p className="text-2xl font-extrabold text-indigo-400 mt-1">{stats.confirmedBookings ?? 0}</p>
+              <span className="text-[11px] text-slate-500">{stats.cancelledBookings ?? 0} cancelled</span>
+            </div>
+            <div className="bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
+              <span className="text-xs text-slate-400 font-medium">On waitlists</span>
+              <p className="text-2xl font-extrabold text-amber-400 mt-1">{stats.waitlistActive ?? 0}</p>
+              <span className="text-[11px] text-slate-500">{stats.eventCount ?? 0} events</span>
+            </div>
+          </div>
+
+          <div className="lg:col-span-2 bg-slate-900/80 border border-slate-800 rounded-2xl p-4">
+            <span className="text-xs text-slate-400 font-medium">Top events by revenue</span>
+            {(!stats.topEvents || stats.topEvents.length === 0) ? (
+              <p className="text-xs text-slate-500 mt-3">No sales yet.</p>
+            ) : (
+              <div className="mt-3 space-y-2">
+                {stats.topEvents.map((ev) => {
+                  const max = stats.topEvents[0].revenue || 1;
+                  return (
+                    <div key={ev.eventId} className="text-xs">
+                      <div className="flex justify-between text-slate-300 mb-1">
+                        <span className="truncate pr-2">{ev.title || 'Deleted event'}</span>
+                        <span className="text-slate-400 whitespace-nowrap">
+                          ${ev.revenue} · {ev.tickets} tickets
+                        </span>
+                      </div>
+                      <div className="h-2 rounded-full bg-slate-800">
+                        <div
+                          className="h-2 rounded-full bg-indigo-500"
+                          style={{ width: `${Math.max(4, (ev.revenue / max) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* User Table & Filtering */}
       <div className="bg-slate-900/90 border border-slate-800 rounded-2xl p-6 shadow-xl space-y-4">
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

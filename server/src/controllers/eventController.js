@@ -1,3 +1,4 @@
+const { containsRegex } = require('../utils/regex');
 const mongoose = require('mongoose');
 const Event = require('../models/Event');
 const Venue = require('../models/Venue');
@@ -72,8 +73,8 @@ async function getEvents(req, res, next) {
 
     if (search) {
       filter.$or = [
-        { title: new RegExp(search, 'i') },
-        { description: new RegExp(search, 'i') },
+        { title: containsRegex(search) },
+        { description: containsRegex(search) },
       ];
     }
 
@@ -86,7 +87,7 @@ async function getEvents(req, res, next) {
 
     // Filter by venue city if provided
     if (city) {
-      const cityRegex = new RegExp(city, 'i');
+      const cityRegex = containsRegex(city);
       events = events.filter((ev) => ev.venueId && cityRegex.test(ev.venueId.city));
     }
 

@@ -1,43 +1,66 @@
 const Seat = require('../models/Seat');
 const WaitlistEntry = require('../models/WaitlistEntry');
-const { emitSeatReleased } = require('../sockets/seatSocket');
-const { offerFreedSeatToWaitlist, expireWaitlistOfferAndHandOff } = require('../services/waitlistService');
+const Booking = require('../models/Booking');
+const { handOffSeat, expireOfferAndHandOff, releaseCancelledSeats } = require('../services/waitlistService');
 
 /**
- * Sweep expired held seats and expired waitlist offers back to available or next in FIFO
- * Runs every 30 seconds as specified
+ * Sweep expired waitlist offers and expired seat holds.
+ * Runs every 30 seconds.
+ *
+ * Each seat is moved with handOffSeat(), whose writes are conditional on the seat still
+ * being in the state we found it in. If a customer re-holds an expired seat between the
+ * find() below and the update, that customer's hold wins and this job simply skips it.
+ *
+ * @returns {Promise<number>} how many offers/holds were actually processed
  */
-async function cleanExpiredHolds(io) {
+async function cleanExpiredHolds(io, { offerDurationMs } = {}) {
+  let processed = 0;
+
   try {
     const now = new Date();
 
-    // 1. Sweep expired waitlist offers (15-min offer window passed)
-    const expiredOffers = await WaitlistEntry.find({
-      status: 'offered',
-      offerExpiresAt: { $lt: now },
-    });
-
+    // 1. Expired waitlist offers (15-minute window passed) -> next person in line
+    const expiredOffers = await WaitlistEntry.find(
+      { status: 'offered', offerExpiresAt: { $lt: now } },
+      { _id: 1 }
+    );
     for (const offer of expiredOffers) {
-      await expireWaitlistOfferAndHandOff(offer, io);
+      const result = await expireOfferAndHandOff(offer._id, io, offerDurationMs);
+      if (result.outcome !== 'skipped') processed += 1;
     }
 
-    // 2. Sweep standard expired held seats (10-min hold window passed)
-    const expiredSeats = await Seat.find({
-      status: 'held',
-      holdUntil: { $lt: now },
-    });
-
+    // 2. Ordinary expired holds (10-minute checkout window passed)
+    const expiredSeats = await Seat.find(
+      { status: 'held', holdUntil: { $lt: new Date() } },
+      { _id: 1, eventId: 1, heldBy: 1, holdUntil: 1 }
+    );
     for (const seat of expiredSeats) {
-      // Check if someone is on the waitlist for this event
-      await offerFreedSeatToWaitlist(seat, io);
+      const result = await handOffSeat({
+        seatId: seat._id,
+        eventId: seat.eventId,
+        // Same holder, same expiry: proves nobody re-held it since we read it
+        seatStateFilter: { status: 'held', heldBy: seat.heldBy, holdUntil: seat.holdUntil },
+        io,
+        durationMs: offerDurationMs,
+      });
+      if (result.outcome !== 'skipped') processed += 1;
     }
 
-    return expiredSeats.length + expiredOffers.length;
+    // 3. Self-healing: cancellations whose seats were never released (crash between steps)
+    const stuck = await Booking.find({
+      status: 'cancelled',
+      seatsReleasedAt: null,
+      cancelledAt: { $lt: new Date(Date.now() - 60 * 1000) },
+    });
+    for (const booking of stuck) {
+      await releaseCancelledSeats(booking, io);
+    }
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('[Seat Expiry Job Error]:', error.message);
-    return 0;
   }
+
+  return processed;
 }
 
 let intervalHandle = null;

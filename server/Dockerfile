@@ -5,8 +5,8 @@ WORKDIR /app
 # Copy package manifests
 COPY package*.json ./
 
-# Install production dependencies
-RUN npm install
+# Install production dependencies exactly as locked
+RUN npm ci --omit=dev
 
 # Copy application source
 COPY . .

@@ -35,21 +35,31 @@ describe('Database Seed Script', () => {
     const isPasswordValid = await alice.comparePassword('Password123!');
     expect(isPasswordValid).toBe(true);
 
-    // Verify 3 events created
+    // Verify events created
     const Venue = require('../src/models/Venue');
     const Event = require('../src/models/Event');
     const Seat = require('../src/models/Seat');
 
+    const Booking = require('../src/models/Booking');
+
     const venues = await Venue.find({});
-    expect(venues.length).toBe(3);
+    expect(venues.length).toBe(4);
 
     const events = await Event.find({});
-    expect(events.length).toBe(3);
+    expect(events.length).toBe(4);
 
-    // Verify each event has 200+ seats
-    for (const ev of events) {
+    // The 3 main events each have 200+ seats, all available
+    const mainEvents = events.filter((ev) => !ev.title.includes('Waitlist Demo'));
+    expect(mainEvents.length).toBe(3);
+    for (const ev of mainEvents) {
       const seatsCount = await Seat.countDocuments({ eventId: ev._id });
       expect(seatsCount).toBeGreaterThanOrEqual(200);
     }
+
+    // The waitlist demo event is completely sold out, split across 2 bookings
+    const demo = events.find((ev) => ev.title.includes('Waitlist Demo'));
+    expect(await Seat.countDocuments({ eventId: demo._id })).toBe(12);
+    expect(await Seat.countDocuments({ eventId: demo._id, status: 'booked' })).toBe(12);
+    expect(await Booking.countDocuments({ eventId: demo._id, status: 'confirmed' })).toBe(2);
   });
 });

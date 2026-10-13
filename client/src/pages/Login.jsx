@@ -113,7 +113,7 @@ export default function Login() {
         <div className="mt-8 pt-6 border-t border-slate-800">
           <p className="text-xs font-semibold uppercase tracking-wider text-slate-400 text-center mb-3 flex items-center justify-center gap-1.5">
             <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
-            Phase 1 Seed Accounts (Quick Autofill)
+            Demo accounts (quick fill)
           </p>
           <div className="grid grid-cols-3 gap-2">
             <button

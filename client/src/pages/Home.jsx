@@ -25,7 +25,7 @@ export default function Home() {
         <div className="relative z-10 max-w-3xl space-y-6">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 text-xs font-semibold">
             <Zap className="w-3.5 h-3.5 text-indigo-400" />
-            <span>Phase 1 Architecture Complete: Auth & Replica Set Ready</span>
+            <span>No seat is ever sold twice</span>
           </div>
 
           <h1 className="text-4xl sm:text-5xl font-extrabold text-white tracking-tight leading-tight">

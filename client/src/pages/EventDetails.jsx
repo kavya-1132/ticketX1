@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { getEventById, getEventSeats, holdSeat, releaseSeat, confirmBooking } from '../api/events';
+import { getMyWaitlist, joinWaitlist, leaveWaitlist } from '../api/tickets';
 import { useAuth } from '../context/AuthContext';
 import { io } from 'socket.io-client';
 import {
@@ -15,6 +16,7 @@ import {
   Sparkles,
   ArrowLeft,
   Users,
+  Hourglass,
 } from 'lucide-react';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -34,6 +36,31 @@ export default function EventDetails() {
 
   // Countdown timer state
   const [timeLeftSeconds, setTimeLeftSeconds] = useState(null);
+
+  // Waitlist state for this event (customers only)
+  const [waitlistEntry, setWaitlistEntry] = useState(null);
+  const [waitlistBusy, setWaitlistBusy] = useState(false);
+  const isCustomer = user?.role === 'customer';
+
+  const loadWaitlist = async () => {
+    if (!isAuthenticated || user?.role !== 'customer') {
+      setWaitlistEntry(null);
+      return;
+    }
+    try {
+      const data = await getMyWaitlist();
+      const entry = data.entries.find(
+        (e) => (e.eventId?._id || e.eventId?.id || e.eventId) === eventId
+      );
+      setWaitlistEntry(entry || null);
+    } catch {
+      // Non-critical: the seat map still works without waitlist info
+    }
+  };
+
+  useEffect(() => {
+    loadWaitlist();
+  }, [eventId, isAuthenticated, user?.role]);
 
   // Fetch Event & Seats
   const loadData = async () => {
@@ -66,6 +93,11 @@ export default function EventDetails() {
 
     // Live update when any user holds a seat
     socket.on('seat:held', (data) => {
+      const me = user?.id || user?._id;
+      if (me && data.heldBy === me) {
+        // Could be a waitlist offer landing for this user
+        loadWaitlist();
+      }
       setSeats((prev) =>
         prev.map((s) =>
           s.id === data.seatId || s._id === data.seatId
@@ -101,7 +133,7 @@ export default function EventDetails() {
       socket.emit('leave:event', eventId);
       socket.disconnect();
     };
-  }, [eventId]);
+  }, [eventId, user?.id, user?._id]);
 
   // Current user's held seats
   const myHeldSeats = useMemo(() => {
@@ -224,6 +256,7 @@ export default function EventDetails() {
       const seatIds = myHeldSeats.map((s) => s.id || s._id);
       const res = await confirmBooking({ eventId, seatIds });
       setBookingSuccess(res.booking);
+      loadWaitlist();
 
       // Locally mark seats as booked
       setSeats((prev) =>
@@ -234,6 +267,37 @@ export default function EventDetails() {
       loadData();
     } finally {
       setConfirmingPayment(false);
+    }
+  };
+
+  const handleJoinWaitlist = async () => {
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: { pathname: `/events/${eventId}` } } });
+      return;
+    }
+    setWaitlistBusy(true);
+    setErrorMsg('');
+    try {
+      await joinWaitlist(eventId);
+      await loadWaitlist();
+    } catch (err) {
+      setErrorMsg(err.response?.data?.error || 'Could not join the waitlist');
+      loadData();
+    } finally {
+      setWaitlistBusy(false);
+    }
+  };
+
+  const handleLeaveWaitlist = async () => {
+    setWaitlistBusy(true);
+    try {
+      await leaveWaitlist(eventId);
+      setWaitlistEntry(null);
+      loadData();
+    } catch (err) {
+      setErrorMsg(err.response?.data?.error || 'Could not leave the waitlist');
+    } finally {
+      setWaitlistBusy(false);
     }
   };
 
@@ -258,6 +322,8 @@ export default function EventDetails() {
   }
 
   const totalHeldPrice = myHeldSeats.reduce((sum, s) => sum + s.price, 0);
+  const soldOut = seats.length > 0 && !seats.some((s) => s.status === 'available');
+  const hasOffer = waitlistEntry?.status === 'offered';
 
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
@@ -337,6 +403,17 @@ export default function EventDetails() {
         </div>
       )}
 
+      {/* Waitlist offer: a cancelled seat is being held for this customer */}
+      {hasOffer && myHeldSeats.length > 0 && (
+        <div className="p-5 rounded-3xl bg-emerald-950/40 border border-emerald-500/40 text-sm flex items-center gap-3">
+          <Hourglass className="w-5 h-5 text-emerald-400 shrink-0" />
+          <p className="text-emerald-200">
+            <strong className="text-emerald-300">A seat opened up for you from the waitlist.</strong>{' '}
+            It's held in your checkout for 15 minutes. Pay below to keep it, or it goes to the next person in line.
+          </p>
+        </div>
+      )}
+
       {/* Booking Confirmed Modal Banner */}
       {bookingSuccess && (
         <div className="p-6 rounded-3xl bg-emerald-950/40 border border-emerald-500/40 text-emerald-300 text-sm flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-xl">
@@ -348,13 +425,25 @@ export default function EventDetails() {
             <p className="text-xs text-slate-300">
               Booking Ref: <code className="text-white font-mono">{bookingSuccess.id || bookingSuccess._id}</code> | Total Paid: <strong className="text-white">${bookingSuccess.total}</strong>
             </p>
+            <p className="text-xs text-slate-400">Your QR ticket is below and has been emailed to you.</p>
           </div>
-          <button
-            onClick={() => setBookingSuccess(null)}
-            className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs rounded-xl transition"
-          >
-            Dismiss
-          </button>
+          {bookingSuccess.qrCode && (
+            <img src={bookingSuccess.qrCode} alt="Your QR ticket" className="w-28 h-28 rounded-xl bg-white p-1.5" />
+          )}
+          <div className="flex flex-col gap-2">
+            <Link
+              to="/my-tickets"
+              className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-slate-950 font-bold text-xs rounded-xl transition text-center"
+            >
+              My Tickets
+            </Link>
+            <button
+              onClick={() => setBookingSuccess(null)}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-xs rounded-xl transition"
+            >
+              Dismiss
+            </button>
+          </div>
         </div>
       )}
 
@@ -460,6 +549,44 @@ export default function EventDetails() {
 
         {/* Right 1 Column: Checkout & Hold Countdown Panel */}
         <div className="space-y-6">
+          {/* Sold out -> FIFO waitlist */}
+          {soldOut && myHeldSeats.length === 0 && (!isAuthenticated || isCustomer) && (
+            <div className="bg-amber-950/30 border border-amber-500/30 rounded-3xl p-5 space-y-3 text-xs">
+              <h2 className="text-sm font-bold text-amber-300 flex items-center gap-2">
+                <Hourglass className="w-4 h-4" />
+                Sold out
+              </h2>
+              {waitlistEntry?.status === 'waiting' ? (
+                <>
+                  <p className="text-slate-300">
+                    You're <strong className="text-white">#{waitlistEntry.position}</strong> on the waitlist. If someone
+                    cancels, their seat is held for you for 15 minutes and we email you.
+                  </p>
+                  <button
+                    onClick={handleLeaveWaitlist}
+                    disabled={waitlistBusy}
+                    className="w-full py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold border border-slate-700 transition disabled:opacity-50"
+                  >
+                    Leave waitlist
+                  </button>
+                </>
+              ) : (
+                <>
+                  <p className="text-slate-300">
+                    Join the waitlist. Cancelled seats go to people in the order they joined.
+                  </p>
+                  <button
+                    onClick={handleJoinWaitlist}
+                    disabled={waitlistBusy}
+                    className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition disabled:opacity-50"
+                  >
+                    {waitlistBusy ? 'Joining...' : 'Join waitlist'}
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
           <div className="bg-slate-900/95 border border-slate-800 rounded-3xl p-6 shadow-2xl sticky top-20 space-y-5">
             <div className="flex items-center justify-between pb-4 border-b border-slate-800">
               <h2 className="text-base font-bold text-white flex items-center gap-2">

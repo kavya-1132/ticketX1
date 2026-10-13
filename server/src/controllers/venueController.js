@@ -1,3 +1,4 @@
+const { containsRegex } = require('../utils/regex');
 const Venue = require('../models/Venue');
 
 /**
@@ -37,7 +38,7 @@ async function getVenues(req, res, next) {
     const { city } = req.query;
     const filter = {};
     if (city) {
-      filter.city = new RegExp(city, 'i');
+      filter.city = containsRegex(city);
     }
 
     const venues = await Venue.find(filter).sort({ name: 1 });

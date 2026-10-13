@@ -7,6 +7,9 @@ const { connectDB, disconnectDB } = require('./db');
 const Venue = require('../models/Venue');
 const Event = require('../models/Event');
 const Seat = require('../models/Seat');
+const Booking = require('../models/Booking');
+const WaitlistEntry = require('../models/WaitlistEntry');
+const { generateQrToken } = require('../services/qrService');
 const { generateSeatsForEvent } = require('../services/seatGenerator');
 
 const SEED_USERS = [
@@ -85,6 +88,8 @@ async function seedUsers() {
     await Venue.deleteMany({});
     await Event.deleteMany({});
     await Seat.deleteMany({});
+    await Booking.deleteMany({});
+    await WaitlistEntry.deleteMany({});
 
     const saltRounds = 10;
     const usersToInsert = await Promise.all(
@@ -204,11 +209,50 @@ async function seedUsers() {
     // eslint-disable-next-line no-console
     console.log(`\nTotal Seats Generated: ${seats1.length + seats2.length + seats3.length}`);
 
+    // Seed Event 4: a tiny SOLD-OUT show for demoing the waitlist.
+    // Bob and Charlie own all 12 seats. Log in as Alice, join the waitlist,
+    // then log in as Bob and cancel his booking: Alice is offered his seats for 15 minutes.
+    const studio = await Venue.create({
+      name: 'Basement Jazz Studio',
+      city: 'Chennai',
+      layout: { rows: ['A', 'B'], seatsPerRow: 6 },
+    });
+    const soldOut = await Event.create({
+      title: 'Sold-Out Jazz Night (Waitlist Demo)',
+      type: 'concert',
+      venueId: studio._id,
+      organiserId: concertOrg._id,
+      startsAt: new Date(Date.now() + 5 * 86400000),
+      priceBySection: { General: 40 },
+      description: 'A deliberately sold-out show. Join the waitlist, then cancel a booking as another user to watch the FIFO hand-off.',
+      status: 'published',
+    });
+    const soldOutSeats = await generateSeatsForEvent(soldOut, studio);
+    const bob = insertedUsers.find((u) => u.email === 'bob@ticketx.com');
+    const charlie = insertedUsers.find((u) => u.email === 'charlie@ticketx.com');
+    for (const [owner, row] of [[bob, 'A'], [charlie, 'B']]) {
+      const rowSeats = soldOutSeats.filter((s) => s.row === row);
+      const booking = await Booking.create({
+        userId: owner._id,
+        eventId: soldOut._id,
+        seatIds: rowSeats.map((s) => s._id),
+        total: rowSeats.reduce((sum, s) => sum + s.price, 0),
+        status: 'confirmed',
+        qrToken: generateQrToken(),
+      });
+      await Seat.updateMany(
+        { _id: { $in: rowSeats.map((s) => s._id) } },
+        { $set: { status: 'booked', bookingId: booking._id } }
+      );
+    }
+    // eslint-disable-next-line no-console
+    console.log(`  4. "${soldOut.title}" (${soldOutSeats.length} seats, all booked by Bob + Charlie)`);
+
     // eslint-disable-next-line no-console
     console.log('\nSeeding complete.');
     return {
       users: insertedUsers,
-      events: [event1, event2, event3],
+      events: [event1, event2, event3, soldOut],
       totalSeats: seats1.length + seats2.length + seats3.length,
     };
   } catch (error) {

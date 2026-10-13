@@ -1,5 +1,10 @@
 const jwt = require('jsonwebtoken');
 
+if (process.env.NODE_ENV === 'production' && !process.env.JWT_SECRET) {
+  // A known default secret would let anyone forge an admin token
+  throw new Error('JWT_SECRET must be set in production');
+}
+
 const JWT_SECRET = process.env.JWT_SECRET || 'ticketx-dev-super-secret-key-2026';
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '7d';
 

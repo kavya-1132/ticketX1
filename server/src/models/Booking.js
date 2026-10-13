@@ -36,6 +36,21 @@ const bookingSchema = new mongoose.Schema({
     index: true,
     sparse: true,
   },
+  // Set once when an organiser scans the ticket at the gate; a second scan is rejected
+  checkedInAt: {
+    type: Date,
+    default: null,
+  },
+  cancelledAt: {
+    type: Date,
+    default: null,
+  },
+  // Set after a cancelled booking's seats have been handed to the waitlist / put back on sale.
+  // The expiry job retries any cancellation where this is still null (e.g. server crashed mid-way).
+  seatsReleasedAt: {
+    type: Date,
+    default: null,
+  },
   createdAt: {
     type: Date,
     default: Date.now,
@@ -46,6 +61,8 @@ bookingSchema.methods.toJSON = function () {
   const obj = this.toObject();
   obj.id = obj._id.toString();
   delete obj.__v;
+  // The QR token is the ticket itself; it is only sent to the owner through the ticket endpoints
+  delete obj.qrToken;
   return obj;
 };
 
