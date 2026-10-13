@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import EventPoster from '../components/EventPoster';
 import { Link } from 'react-router-dom';
 import { getEvents } from '../api/events';
 import {
@@ -52,12 +53,8 @@ export default function EventsList() {
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 text-xs font-semibold mb-2">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span>Live seat maps</span>
-          </div>
-          <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
-            Events & screenings
+          <h1 className="text-5xl sm:text-6xl font-black uppercase text-white leading-none">
+            What&apos;s on
           </h1>
           <p className="text-sm text-slate-400 mt-1">
             Pick your exact seat on a live map.
@@ -138,141 +135,104 @@ export default function EventsList() {
         </button>
       </div>
 
-      {/* Events Grid */}
+      {/* Events */}
       {loading ? (
-        <div className="py-24 text-center text-slate-400">
-          <div className="w-8 h-8 border-4 border-indigo-500/30 border-t-indigo-500 rounded-full animate-spin mx-auto mb-3" />
-          <p className="text-sm font-medium">Loading events...</p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          {[0, 1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="rounded-2xl overflow-hidden bg-slate-900 ring-1 ring-slate-800">
+              <div className="skeleton rounded-none h-52" />
+              <div className="p-4 space-y-2.5">
+                <div className="skeleton h-4 w-3/4" />
+                <div className="skeleton h-4 w-1/2" />
+                <div className="skeleton h-11 w-full mt-4" />
+              </div>
+            </div>
+          ))}
         </div>
       ) : events.length === 0 ? (
-        <div className="bg-slate-900/60 border border-slate-800 rounded-3xl p-12 text-center max-w-md mx-auto space-y-3">
+        <div className="rounded-3xl p-10 text-center max-w-md mx-auto space-y-3 bg-slate-900 ring-1 ring-slate-800">
           <Ticket className="w-10 h-10 text-slate-500 mx-auto" />
-          <h3 className="text-lg font-bold text-white">No Events Found</h3>
-          <p className="text-xs text-slate-400">
-            No events match your current filter settings. Try clearing the search or city filter.
-          </p>
+          <h3 className="text-lg font-bold text-white">No events match</h3>
+          <p className="text-sm text-slate-400">Try a different search or city, or clear the filters to see everything.</p>
           <button
             onClick={() => {
               setSelectedType('');
               setCityFilter('');
               setSearchQuery('');
             }}
-            className="px-4 py-2 bg-indigo-600 text-white text-xs font-semibold rounded-lg hover:bg-indigo-500 transition"
+            className="px-5 py-2.5 bg-indigo-600 text-white text-sm font-semibold rounded-xl hover:bg-indigo-500 transition"
           >
-            Reset Filters
+            Clear filters
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
           {events.map((ev) => {
-            const dateStr = new Date(ev.startsAt).toLocaleDateString(undefined, {
-              weekday: 'short',
-              month: 'short',
-              day: 'numeric',
-              hour: '2-digit',
-              minute: '2-digit',
-            });
-
             const priceValues = ev.priceBySection ? Object.values(ev.priceBySection) : [];
             const minPrice = priceValues.length ? Math.min(...priceValues) : 0;
-            const maxPrice = priceValues.length ? Math.max(...priceValues) : 0;
-
-            const isMovie = ev.type === 'movie';
+            const left = ev.availableSeats ?? 0;
+            const total = ev.totalSeats ?? 0;
+            const filled = total ? Math.round(((total - left) / total) * 100) : 0;
 
             return (
-              <div
+              <Link
                 key={ev.id}
-                className="group bg-slate-900/80 border border-slate-800 hover:border-indigo-500/50 rounded-3xl overflow-hidden shadow-xl transition-all duration-200 flex flex-col justify-between hover:-translate-y-1"
+                to={`/events/${ev.id}`}
+                className="group rounded-2xl overflow-hidden bg-slate-900 ring-1 ring-slate-800 hover:ring-marquee-400/60 transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_40px_-18px_rgba(216,31,72,0.6)] flex flex-col"
               >
-                <div>
-                  {/* Banner / Poster Header */}
-                  <div
-                    className={`h-28 sm:h-40 p-4 sm:p-5 flex flex-col justify-between relative overflow-hidden ${
-                      isMovie
-                        ? 'bg-gradient-to-br from-indigo-900/60 via-slate-900 to-slate-950'
-                        : 'bg-gradient-to-br from-violet-900/60 via-slate-900 to-slate-950'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between z-10">
-                      <span
-                        className={`px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wider flex items-center gap-1 border ${
-                          isMovie
-                            ? 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30'
-                            : 'bg-violet-500/20 text-violet-300 border-violet-500/30'
-                        }`}
-                      >
-                        {isMovie ? <Film className="w-3 h-3" /> : <Music className="w-3 h-3" />}
-                        {ev.type}
-                      </span>
-
-                      <span className="text-xs font-bold text-white/90 bg-slate-950/60 px-2.5 py-1 rounded-full border border-slate-800 backdrop-blur-md">
-                        ${minPrice} {maxPrice > minPrice ? `- $${maxPrice}` : ''}
-                      </span>
-                    </div>
-
-                    <div className="z-10">
-                      <div className="flex items-center gap-1.5 text-[11px] text-slate-300">
-                        <Calendar className="w-3.5 h-3.5 text-indigo-400" />
-                        <span>{dateStr}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Body Info */}
-                  <div className="p-4 sm:p-6 space-y-3 sm:space-y-4">
-                    <div>
-                      <h2 className="text-lg font-bold text-white group-hover:text-indigo-300 transition leading-snug">
-                        {ev.title}
-                      </h2>
-                      {ev.venueId && (
-                        <p className="text-xs text-slate-400 mt-1 flex items-center gap-1">
-                          <MapPin className="w-3.5 h-3.5 text-slate-500 shrink-0" />
-                          <span>
-                            {ev.venueId.name}, {ev.venueId.city}
-                          </span>
-                        </p>
-                      )}
-                    </div>
-
-                    {ev.description && (
-                      <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">
-                        {ev.description}
+                <div className="overflow-hidden">
+                  <EventPoster event={ev} className="h-52 transition-transform duration-500 group-hover:scale-[1.03]" />
+                </div>
+                <div className="p-4 flex-1 flex flex-col gap-3">
+                  <div className="text-sm text-slate-300 space-y-1">
+                    <p className="flex items-center gap-1.5">
+                      <Calendar className="w-4 h-4 text-slate-500 shrink-0" />
+                      {new Date(ev.startsAt).toLocaleString(undefined, {
+                        weekday: 'short',
+                        day: 'numeric',
+                        month: 'short',
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
+                    </p>
+                    {ev.venueId && (
+                      <p className="flex items-center gap-1.5">
+                        <MapPin className="w-4 h-4 text-slate-500 shrink-0" />
+                        <span className="truncate">
+                          {ev.venueId.name}, {ev.venueId.city}
+                        </span>
                       </p>
                     )}
+                  </div>
 
-                    {/* Seat Stats */}
-                    <div className="bg-slate-950/60 border border-slate-800/80 rounded-xl p-3 flex items-center justify-between text-xs">
-                      <div>
-                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">
-                          Availability
-                        </span>
-                        <span className={`font-extrabold ${(ev.availableSeats ?? 0) === 0 ? 'text-rose-300' : 'text-emerald-400'}`}>
-                          {(ev.availableSeats ?? 0) === 0 ? 'Sold out' : `${ev.availableSeats} seats left`}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <span className="text-slate-400 block text-[10px] uppercase font-semibold">
-                          Capacity
-                        </span>
-                        <span className="font-semibold text-slate-300">
-                          {ev.totalSeats ?? 0} Total
-                        </span>
-                      </div>
+                  <div className="space-y-1.5">
+                    <div className="flex justify-between text-xs">
+                      <span
+                        className={
+                          left === 0
+                            ? 'text-indigo-300 font-semibold'
+                            : left < 20
+                            ? 'text-marquee-300 font-semibold'
+                            : 'text-emerald-300 font-semibold'
+                        }
+                      >
+                        {left === 0 ? 'Sold out' : left < 20 ? `Only ${left} left` : `${left} seats left`}
+                      </span>
+                      <span className="text-slate-400">from ${minPrice}</span>
+                    </div>
+                    <div className="h-1 rounded-full bg-slate-800 overflow-hidden">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-marquee-400 to-indigo-500"
+                        style={{ width: `${Math.max(filled, 2)}%` }}
+                      />
                     </div>
                   </div>
-                </div>
 
-                {/* Footer Action */}
-                <div className="p-4 sm:p-6 pt-0 sm:pt-0">
-                  <Link
-                    to={`/events/${ev.id}`}
-                    className="w-full py-3 px-4 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 group-hover:shadow-indigo-600/40 transition active:scale-95"
-                  >
-                    <span>{(ev.availableSeats ?? 0) === 0 ? 'Join waitlist' : 'Pick seats'}</span>
-                    <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
-                  </Link>
+                  <span className="mt-auto w-full py-3 rounded-xl text-sm font-bold text-center text-white bg-indigo-600 group-hover:bg-indigo-500 transition">
+                    {left === 0 ? 'Join the waitlist' : 'Pick seats'}
+                  </span>
                 </div>
-              </div>
+              </Link>
             );
           })}
         </div>

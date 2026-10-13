@@ -5,6 +5,9 @@ import { getMyWaitlist, joinWaitlist, leaveWaitlist } from '../api/tickets';
 import { useAuth } from '../context/AuthContext';
 import { io } from 'socket.io-client';
 import SeatMap from '../components/SeatMap';
+import EventPoster from '../components/EventPoster';
+import TicketStub from '../components/TicketStub';
+import CountdownRing from '../components/CountdownRing';
 import {
   Calendar,
   MapPin,
@@ -263,7 +266,9 @@ export default function EventDetails() {
     try {
       const seatIds = myHeldSeats.map((s) => s.id || s._id);
       const res = await confirmBooking({ eventId, seatIds });
-      setBookingSuccess(res.booking);
+      setBookingSuccess({ ...res.booking, seatsDetail: myHeldSeats.map((s) => ({ ...s })) });
+      // Bring the ticket reveal into view (on phones you're usually scrolled down at the seat map)
+      window.scrollTo({ top: 0, behavior: 'smooth' });
       loadWaitlist();
 
       // Locally mark seats as booked
@@ -349,10 +354,10 @@ export default function EventDetails() {
     <button
       disabled={myHeldSeats.length === 0 || confirmingPayment}
       onClick={handlePayAndConfirm}
-      className={`py-3.5 px-5 bg-gradient-to-r from-emerald-500 to-teal-500 hover:from-emerald-400 hover:to-teal-400 text-slate-950 font-black rounded-xl text-sm shadow-lg shadow-emerald-600/30 transition duration-150 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 ${extra}`}
+      className={`py-3.5 px-5 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl text-base shadow-lg shadow-indigo-600/40 transition duration-150 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 ${extra}`}
     >
       {confirmingPayment ? (
-        <span className="w-4 h-4 border-2 border-slate-950/40 border-t-slate-950 rounded-full animate-spin" />
+        <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
       ) : (
         <>
           <CreditCard className="w-4 h-4" />
@@ -366,10 +371,10 @@ export default function EventDetails() {
     <div className={`max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-4 sm:py-8 space-y-4 sm:space-y-6 ${myHeldSeats.length > 0 ? 'pb-32 lg:pb-8' : ''}`}>
       {/* Error toast (stays visible wherever you've scrolled) */}
       {errorMsg && (
-        <div className="fixed top-16 md:top-20 inset-x-3 sm:inset-x-auto sm:right-6 sm:max-w-sm z-[60] p-3.5 rounded-2xl bg-rose-950/95 border border-rose-500/50 text-rose-100 text-sm flex items-start gap-2.5 shadow-2xl animate-shake">
-          <ShieldAlert className="w-5 h-5 text-rose-400 shrink-0 mt-0.5" />
+        <div className="fixed top-16 md:top-20 inset-x-3 sm:inset-x-auto sm:right-6 sm:max-w-sm z-[60] p-3.5 rounded-2xl bg-indigo-950/95 backdrop-blur border border-indigo-500/50 text-indigo-50 text-sm flex items-start gap-2.5 shadow-2xl animate-toast-in">
+          <ShieldAlert className="w-5 h-5 text-indigo-300 shrink-0 mt-0.5" />
           <span className="flex-1">{errorMsg}</span>
-          <button onClick={() => setErrorMsg('')} className="text-rose-300 hover:text-white" aria-label="Dismiss">
+          <button onClick={() => setErrorMsg('')} className="text-indigo-200 hover:text-white" aria-label="Dismiss">
             <X className="w-4 h-4" />
           </button>
         </div>
@@ -385,89 +390,102 @@ export default function EventDetails() {
           <span>All events</span>
         </Link>
 
-        <div className="bg-slate-900/90 border border-slate-800 rounded-3xl p-5 sm:p-8 flex flex-col md:flex-row items-start md:items-center justify-between gap-5 shadow-2xl">
-          <div className="space-y-2 min-w-0">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-extrabold uppercase tracking-wider bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">
-                {event.type}
-              </span>
-              <span className={`text-xs font-semibold ${seatsLeft === 0 ? 'text-rose-300' : seatsLeft < 20 ? 'text-amber-300' : 'text-emerald-400'}`}>
+        <div className="grid sm:grid-cols-[200px_1fr] lg:grid-cols-[240px_1fr] rounded-3xl overflow-hidden bg-slate-900 ring-1 ring-slate-800 shadow-2xl">
+          <EventPoster event={event} showTitle={false} compact className="h-20 sm:h-full sm:min-h-[220px]" />
+          <div className="p-4 sm:p-7 flex flex-col gap-3 sm:gap-4 justify-center min-w-0">
+            <div className="space-y-2">
+              <p
+                className={`text-sm font-semibold ${
+                  seatsLeft === 0 ? 'text-indigo-300' : seatsLeft < 20 ? 'text-marquee-300' : 'text-emerald-300'
+                }`}
+              >
                 {seatsLeft === 0 ? 'Sold out' : seatsLeft < 20 ? `Only ${seatsLeft} seats left` : `${seatsLeft} seats available`}
-              </span>
-            </div>
-            <h1 className="text-xl sm:text-3xl font-extrabold text-white tracking-tight leading-tight">{event.title}</h1>
-            <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-1.5 sm:gap-4 text-xs sm:text-sm text-slate-400">
-              <span className="flex items-center gap-1.5">
-                <Calendar className="w-4 h-4 text-indigo-400 shrink-0" />
-                {new Date(event.startsAt).toLocaleString(undefined, {
-                  weekday: 'short',
-                  day: 'numeric',
-                  month: 'short',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </span>
-              <span className="flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-indigo-400 shrink-0" />
-                {event.venueId?.name}, {event.venueId?.city}
-              </span>
-            </div>
-          </div>
-
-          {/* Prices */}
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
-            {Object.entries(prices).map(([sec, pr]) => (
-              <div key={sec} className="flex-1 md:flex-none text-center px-3 py-2 rounded-xl bg-slate-950/60 border border-slate-800">
-                <span className="text-[10px] uppercase font-bold text-slate-400 block">{sec}</span>
-                <span className="text-base font-black text-indigo-300">${pr}</span>
+              </p>
+              <h1 className="text-[2rem] sm:text-5xl font-black uppercase text-white leading-[0.92]" style={{ textWrap: 'balance' }}>
+                {event.title}
+              </h1>
+              <div className="flex flex-col sm:flex-row sm:flex-wrap gap-1.5 sm:gap-x-5 text-sm text-slate-300 pt-1">
+                <span className="flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-marquee-400 shrink-0" />
+                  {new Date(event.startsAt).toLocaleString(undefined, {
+                    weekday: 'long',
+                    day: 'numeric',
+                    month: 'long',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                  })}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <MapPin className="w-4 h-4 text-marquee-400 shrink-0" />
+                  {event.venueId?.name}, {event.venueId?.city}
+                </span>
               </div>
-            ))}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              {Object.entries(prices).map(([sec, pr]) => (
+                <div key={sec} className="px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-slate-950/70 ring-1 ring-slate-800 flex sm:block items-baseline gap-2">
+                  <span className="text-xs text-slate-400 block">{sec}</span>
+                  <span className="font-display text-xl sm:text-2xl font-black text-marquee-300 leading-none">${pr}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Waitlist offer: a cancelled seat is being held for this customer */}
       {hasOffer && myHeldSeats.length > 0 && (
-        <div className="p-4 sm:p-5 rounded-2xl bg-emerald-950/40 border border-emerald-500/40 text-sm flex items-start gap-3">
-          <Hourglass className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-          <p className="text-emerald-100">
-            <strong className="text-emerald-300">Good news, a seat opened up for you.</strong> It's saved in your
+        <div className="p-4 sm:p-5 rounded-2xl bg-marquee-400/10 ring-1 ring-marquee-400/40 text-sm flex items-start gap-3 animate-toast-in">
+          <Hourglass className="w-5 h-5 text-marquee-300 shrink-0 mt-0.5" />
+          <p className="text-slate-100">
+            <strong className="text-marquee-200">Good news, a seat opened up for you.</strong> It's saved in your
             basket for 15 minutes. Pay to keep it, or it goes to the next person in line.
           </p>
         </div>
       )}
 
-      {/* Booking confirmed */}
+      {/* Booking confirmed: the ticket prints out of a slot */}
       {bookingSuccess && (
-        <div className="p-5 sm:p-6 rounded-3xl bg-emerald-950/40 border border-emerald-500/40 flex flex-col sm:flex-row items-center gap-5 shadow-xl text-center sm:text-left">
-          {bookingSuccess.qrCode && (
-            <img src={bookingSuccess.qrCode} alt="Your QR ticket" className="w-40 h-40 sm:w-28 sm:h-28 rounded-xl bg-white p-1.5 shrink-0" />
-          )}
-          <div className="space-y-1.5 flex-1">
-            <div className="flex items-center justify-center sm:justify-start gap-2 text-emerald-300 font-extrabold text-lg">
+        <section className="grid md:grid-cols-[1fr_360px] gap-6 items-start" aria-live="polite">
+          <div className="space-y-3 md:pt-6 order-2 md:order-1">
+            <div className="flex items-center gap-2 text-emerald-300 font-semibold">
               <CheckCircle className="w-5 h-5" />
-              <span>You're going!</span>
+              Payment received
             </div>
-            <p className="text-sm text-slate-300">
-              Paid <strong className="text-white">${bookingSuccess.total}</strong>. Show this QR code at the entrance.
-              A copy is in My Tickets and your email.
+            <h2 className="font-display text-5xl sm:text-6xl font-black uppercase text-white leading-[0.9]">You're going!</h2>
+            <p className="text-slate-300 max-w-md">
+              Your ticket is ready. It's saved in My Tickets and we've emailed you a copy. Show the QR code at the entrance.
             </p>
+            <div className="flex gap-2 pt-2">
+              <Link
+                to="/my-tickets"
+                className="px-5 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold transition"
+              >
+                Open My Tickets
+              </Link>
+              <button
+                onClick={() => setBookingSuccess(null)}
+                className="px-5 py-3 rounded-xl ring-1 ring-slate-700 text-slate-200 font-semibold hover:bg-slate-900 transition"
+              >
+                Book more seats
+              </button>
+            </div>
           </div>
-          <div className="flex sm:flex-col gap-2 w-full sm:w-auto">
-            <Link
-              to="/my-tickets"
-              className="flex-1 px-4 py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-sm rounded-xl transition text-center"
-            >
-              My Tickets
-            </Link>
-            <button
-              onClick={() => setBookingSuccess(null)}
-              className="flex-1 px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-200 font-semibold text-sm rounded-xl transition"
-            >
-              Close
-            </button>
+          <div className="order-1 md:order-2 max-w-sm w-full mx-auto">
+            {/* The slot */}
+            <div className="h-3 rounded-full bg-slate-950 ring-1 ring-slate-700 shadow-[inset_0_2px_6px_rgba(0,0,0,0.9)] mx-2 relative z-10" />
+            <div className="-mt-1.5 px-4">
+              <TicketStub
+                className="animate-print"
+                event={event}
+                seats={bookingSuccess.seatsDetail || []}
+                total={bookingSuccess.total}
+                qrCode={bookingSuccess.qrCode}
+              />
+            </div>
           </div>
-        </div>
+        </section>
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-6">
@@ -476,15 +494,15 @@ export default function EventDetails() {
           {/* Legend */}
           <div className="grid grid-cols-2 sm:flex sm:flex-wrap sm:justify-center gap-x-4 gap-y-2 px-2 pb-4 mb-4 border-b border-slate-800 text-xs text-slate-300">
             <span className="flex items-center gap-2">
-              <span className="w-4 h-4 rounded-t-md rounded-b-sm bg-emerald-500/15 border border-emerald-500/50" />
+              <span className="w-4 h-4 rounded-t-md rounded-b-sm bg-emerald-400/10 border border-emerald-400/60" />
               Available
             </span>
             <span className="flex items-center gap-2">
-              <span className="w-4 h-4 rounded-t-md rounded-b-sm bg-indigo-500 border border-indigo-300" />
+              <span className="w-4 h-4 rounded-t-md rounded-b-sm bg-marquee-400 border border-marquee-200 shadow-[0_0_8px_rgba(255,200,87,0.6)]" />
               Your seats
             </span>
             <span className="flex items-center gap-2">
-              <span className="w-4 h-4 rounded-t-md rounded-b-sm bg-amber-500/20 border border-amber-500/40" />
+              <span className="w-4 h-4 rounded-t-md rounded-b-sm bg-indigo-500/20 border border-indigo-400/50" />
               Someone's choosing
             </span>
             <span className="flex items-center gap-2">
@@ -513,8 +531,8 @@ export default function EventDetails() {
         <div className="space-y-4 sm:space-y-6">
           {/* Sold out -> FIFO waitlist */}
           {soldOut && myHeldSeats.length === 0 && (!isAuthenticated || isCustomer) && (
-            <div className="bg-amber-950/30 border border-amber-500/30 rounded-3xl p-5 space-y-3 text-sm">
-              <h2 className="text-base font-bold text-amber-300 flex items-center gap-2">
+            <div className="bg-slate-900 ring-1 ring-marquee-400/30 rounded-3xl p-5 space-y-3 text-sm">
+              <h2 className="font-display text-3xl font-black uppercase text-marquee-300 flex items-center gap-2">
                 <Hourglass className="w-4 h-4" />
                 Sold out
               </h2>
@@ -540,7 +558,7 @@ export default function EventDetails() {
                   <button
                     onClick={handleJoinWaitlist}
                     disabled={waitlistBusy}
-                    className="w-full py-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold transition disabled:opacity-50"
+                    className="w-full py-3 rounded-xl bg-marquee-400 hover:bg-marquee-300 text-slate-950 font-bold transition disabled:opacity-50"
                   >
                     {waitlistBusy ? 'Joining...' : 'Join waitlist'}
                   </button>
@@ -562,16 +580,11 @@ export default function EventDetails() {
             </div>
 
             {myHeldSeats.length > 0 && (
-              <div
-                className={`p-3 rounded-2xl text-xs flex items-center justify-between gap-3 border ${
-                  lowTime ? 'bg-rose-950/40 border-rose-500/40 text-rose-200' : 'bg-indigo-950/40 border-indigo-500/40 text-indigo-200'
-                }`}
-              >
-                <span className="flex items-center gap-2 font-semibold">
-                  <Clock className="w-4 h-4" />
-                  Saved for you for
-                </span>
-                <span className="font-mono font-extrabold text-sm">{formatTime(timeLeftSeconds)}</span>
+              <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-950/60 ring-1 ring-slate-800">
+                <CountdownRing seconds={timeLeftSeconds} total={hasOffer ? 900 : 600} size={52} />
+                <p className={`text-sm ${lowTime ? 'text-indigo-200' : 'text-slate-300'}`}>
+                  {lowTime ? 'Less than a minute left. Pay now to keep these seats.' : 'These seats are saved for you while you pay.'}
+                </p>
               </div>
             )}
 
@@ -586,12 +599,12 @@ export default function EventDetails() {
                   >
                     <div>
                       <span className="font-bold text-white">
-                        Row {seat.row} · Seat {seat.number}
+                        Row {seat.row}, seat {seat.number}
                       </span>
                       <span className="text-xs text-slate-400 block">{seat.section}</span>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="font-bold text-indigo-300">${seat.price}</span>
+                      <span className="font-bold text-marquee-300">${seat.price}</span>
                       <button
                         onClick={() => handleSeatClick(seat)}
                         className="p-1 text-slate-500 hover:text-rose-400 transition"
@@ -621,15 +634,15 @@ export default function EventDetails() {
 
       {/* Basket (phones and tablets): pinned above the tab bar */}
       {myHeldSeats.length > 0 && (
-        <div className="lg:hidden fixed inset-x-0 bottom-16 md:bottom-0 z-40 px-3 pb-3 pt-2 bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent">
-          <div className="max-w-2xl mx-auto bg-slate-900 border border-slate-700 rounded-2xl p-3 shadow-2xl flex items-center gap-3">
+        <div className="lg:hidden fixed inset-x-0 bottom-16 md:bottom-0 z-40 px-3 pb-3 pt-6 bg-gradient-to-t from-slate-950 via-slate-950/95 to-transparent animate-slide-up">
+          <div className="max-w-2xl mx-auto bg-slate-900 ring-1 ring-marquee-400/30 rounded-2xl p-3 shadow-[0_-10px_40px_-10px_rgba(255,200,87,0.25)] flex items-center gap-3">
+            <CountdownRing seconds={timeLeftSeconds} total={hasOffer ? 900 : 600} size={46} />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-white truncate">
-                {myHeldSeats.length} seat{myHeldSeats.length > 1 ? 's' : ''} · {seatList}
+                {seatList}
               </p>
-              <p className={`text-xs flex items-center gap-1 ${lowTime ? 'text-rose-300' : 'text-slate-400'}`}>
-                <Clock className="w-3.5 h-3.5" />
-                Saved for <span className="font-mono font-bold">{formatTime(timeLeftSeconds)}</span>
+              <p className={`text-xs ${lowTime ? 'text-indigo-200' : 'text-slate-400'}`}>
+                {lowTime ? 'Pay now to keep them' : `Saved for you, $${totalHeldPrice} total`}
               </p>
             </div>
             {payButton('shrink-0')}

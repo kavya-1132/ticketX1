@@ -19,6 +19,27 @@ export default function SeatMap({ seats, userId, busySeatId, onSeatClick, stageL
   const scrollRef = useRef(null);
   const [width, setWidth] = useState(0);
   const [zoomed, setZoomed] = useState(null); // null = decide automatically
+  const [changed, setChanged] = useState(() => new Set());
+  const prevStatus = useRef(null);
+
+  // Remember which seats just changed so they can pop (yours) or flash (someone else's)
+  useEffect(() => {
+    const next = new Map(seats.map((s) => [s.id || s._id, `${s.status}:${s.heldBy?._id || s.heldBy || ''}`]));
+    if (prevStatus.current) {
+      const diff = new Set();
+      next.forEach((v, k) => {
+        if (prevStatus.current.has(k) && prevStatus.current.get(k) !== v) diff.add(k);
+      });
+      if (diff.size) {
+        setChanged(diff);
+        const t = setTimeout(() => setChanged(new Set()), 900);
+        prevStatus.current = next;
+        return () => clearTimeout(t);
+      }
+    }
+    prevStatus.current = next;
+    return undefined;
+  }, [seats]);
 
   // Track the available width
   useLayoutEffect(() => {
@@ -82,9 +103,12 @@ export default function SeatMap({ seats, userId, busySeatId, onSeatClick, stageL
   return (
     <div ref={wrapRef} className="w-full">
       {/* Stage / screen */}
-      <div className="mb-6">
-        <div className="w-4/5 sm:w-3/4 mx-auto h-1.5 bg-gradient-to-r from-indigo-500 via-violet-400 to-indigo-500 rounded-full shadow-lg shadow-indigo-500/50" />
-        <p className="text-center text-[11px] font-bold uppercase tracking-widest text-slate-400 mt-2">{stageLabel}</p>
+      <div className="mb-7 relative">
+        <div
+          className="w-4/5 sm:w-3/4 mx-auto h-8 rounded-[50%/100%_100%_0_0] border-t-[3px] border-marquee-300"
+          style={{ boxShadow: '0 -10px 30px -12px rgba(255,200,87,0.55)' }}
+        />
+        <p className="text-center text-sm font-semibold text-marquee-200/80 -mt-3">{stageLabel}</p>
       </div>
 
       {!fitsComfortably && (
@@ -106,21 +130,24 @@ export default function SeatMap({ seats, userId, busySeatId, onSeatClick, stageL
         style={{ WebkitOverflowScrolling: 'touch' }}
       >
         <div className="mx-auto" style={{ width: rowWidth + LABEL_W * 2 + 8 }}>
-          {rows.map(({ row, seats: rowSeats, section, newSection }) => (
+          {rows.map(({ row, seats: rowSeats, section, newSection }, rowIndex) => (
             <React.Fragment key={row}>
               {newSection && (
                 <div
                   className="sticky left-0 flex items-center gap-2 mt-4 mb-2 first:mt-0"
                   style={{ width: isZoomed && width ? width - 4 : '100%' }}
                 >
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">{section}</span>
+                  <span className="text-xs font-semibold text-slate-200">{section}</span>
                   {priceOf(section) !== undefined && priceOf(section) !== null && (
-                    <span className="text-[11px] font-bold text-indigo-300">${priceOf(section)}</span>
+                    <span className="text-xs font-semibold text-marquee-300">${priceOf(section)}</span>
                   )}
                   <span className="flex-1 h-px bg-slate-800" />
                 </div>
               )}
-              <div className="flex items-center" style={{ marginBottom: gap }}>
+              <div
+                className="flex items-center animate-row-in"
+                style={{ marginBottom: gap, animationDelay: `${Math.min(rowIndex * 35, 500)}ms` }}
+              >
                 <span
                   className="sticky left-0 z-10 shrink-0 text-center text-[11px] font-bold text-slate-400 font-mono bg-slate-900"
                   style={{ width: LABEL_W, lineHeight: `${size}px` }}
@@ -136,11 +163,14 @@ export default function SeatMap({ seats, userId, busySeatId, onSeatClick, stageL
                     const booked = seat.status === 'booked';
                     const busy = busySeatId === seatId;
 
+                    const justChanged = changed.has(seatId);
+
                     let cls =
-                      'bg-emerald-500/15 text-emerald-200 border-emerald-500/50 hover:bg-emerald-500/35 active:scale-90';
-                    if (booked) cls = 'bg-slate-800 text-slate-600 border-slate-700/60 cursor-not-allowed';
-                    else if (mine) cls = 'bg-indigo-500 text-white border-indigo-300 ring-2 ring-indigo-300/60 shadow-md shadow-indigo-500/40';
-                    else if (heldOther) cls = 'bg-amber-500/20 text-amber-300/80 border-amber-500/40 cursor-not-allowed';
+                      'bg-emerald-400/10 text-emerald-200 border-emerald-400/60 hover:bg-emerald-400/30 hover:-translate-y-0.5 active:scale-90';
+                    if (booked) cls = 'bg-slate-800/80 text-slate-600 border-slate-700/50 cursor-not-allowed';
+                    else if (mine) cls = 'bg-marquee-400 text-slate-950 border-marquee-200 shadow-[0_0_14px_rgba(255,200,87,0.65)]';
+                    else if (heldOther) cls = 'bg-indigo-500/20 text-indigo-200/70 border-indigo-400/50 cursor-not-allowed';
+                    if (justChanged) cls += mine ? ' animate-pop' : ' animate-flash';
 
                     const status = booked ? 'booked' : mine ? 'held by you' : heldOther ? 'being held by someone' : 'available';
 

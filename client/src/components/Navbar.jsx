@@ -46,11 +46,8 @@ export default function Navbar() {
                 <Ticket className="w-5 h-5 -rotate-45" />
               </div>
               <div className="flex flex-col">
-                <span className="text-lg md:text-xl font-bold bg-gradient-to-r from-white via-indigo-200 to-indigo-400 bg-clip-text text-transparent tracking-tight leading-tight">
+                <span className="font-display font-black uppercase text-2xl md:text-[1.7rem] leading-none text-marquee-200 tracking-wide">
                   TicketX
-                </span>
-                <span className="hidden sm:block text-[10px] tracking-widest uppercase text-slate-400 font-semibold -mt-0.5">
-                  Concerts & Cinema
                 </span>
               </div>
             </Link>
@@ -64,11 +61,11 @@ export default function Navbar() {
                   end={end}
                   className={({ isActive }) =>
                     `flex items-center gap-1.5 px-3 py-2 rounded-lg transition-colors ${
-                      isActive ? 'text-white bg-slate-800' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
+                      isActive ? 'text-marquee-200 bg-slate-800' : 'text-slate-300 hover:text-white hover:bg-slate-800/60'
                     }`
                   }
                 >
-                  <Icon className="w-4 h-4 text-indigo-400" />
+                  <Icon className="w-4 h-4 text-marquee-400" />
                   {label}
                 </NavLink>
               ))}
@@ -136,15 +133,15 @@ export default function Navbar() {
               end={end}
               className={({ isActive }) =>
                 `flex-1 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold transition-colors ${
-                  isActive ? 'text-indigo-300' : 'text-slate-400 active:text-white'
+                  isActive ? 'text-marquee-200' : 'text-slate-400 active:text-white'
                 }`
               }
             >
               {({ isActive }) => (
                 <>
                   <span
-                    className={`flex items-center justify-center w-12 h-7 rounded-full transition-colors ${
-                      isActive ? 'bg-indigo-500/20' : ''
+                    className={`flex items-center justify-center w-12 h-7 rounded-full transition-all duration-200 ${
+                      isActive ? 'bg-marquee-400/15 scale-110' : ''
                     }`}
                   >
                     <Icon className="w-5 h-5" />
@@ -159,7 +156,7 @@ export default function Navbar() {
               to="/login"
               className={({ isActive }) =>
                 `flex-1 flex flex-col items-center justify-center gap-1 text-[11px] font-semibold ${
-                  isActive ? 'text-indigo-300' : 'text-slate-400'
+                  isActive ? 'text-marquee-200' : 'text-slate-400'
                 }`
               }
             >

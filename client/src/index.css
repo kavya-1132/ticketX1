@@ -5,6 +5,104 @@
 @layer base {
   body {
     @apply bg-slate-950 text-slate-100 font-sans antialiased;
+    /* Faint stage-light glow at the top of every page */
+    background-image: radial-gradient(1200px 520px at 50% -180px, rgba(216, 31, 72, 0.16), transparent 70%);
+    background-repeat: no-repeat;
+  }
+
+  h1 {
+    @apply font-display tracking-tight;
+    font-weight: 800;
+  }
+
+  :focus-visible {
+    outline: 2px solid #ffc857;
+    outline-offset: 2px;
+  }
+}
+
+@layer components {
+  /* ---------- Marquee sign: bulbs are real elements (see MarqueeSign.jsx) ---------- */
+  .marquee-sign {
+    position: relative;
+    border-radius: 24px;
+    background: linear-gradient(180deg, #2a1d3f 0%, #1b142e 100%);
+    box-shadow:
+      0 0 0 1px rgba(255, 200, 87, 0.22),
+      0 24px 70px -24px rgba(216, 31, 72, 0.55),
+      inset 0 0 50px rgba(0, 0, 0, 0.55);
+  }
+
+  .marquee-bulbs {
+    animation: lights-on 1100ms steps(1, end) both;
+  }
+
+  .bulb {
+    position: absolute;
+    width: 7px;
+    height: 7px;
+    margin: -3.5px 0 0 -3.5px;
+    border-radius: 9999px;
+    background: #ffe6ad;
+    box-shadow: 0 0 6px 2px rgba(255, 200, 87, 0.55);
+    opacity: 0.45;
+    animation: chase 2.4s linear infinite;
+  }
+
+  /* Flicker on, like a sign being switched on */
+  @keyframes lights-on {
+    0% { opacity: 0; }
+    18% { opacity: 1; }
+    26% { opacity: 0.1; }
+    40% { opacity: 1; }
+    48% { opacity: 0.3; }
+    60%, 100% { opacity: 1; }
+  }
+
+  /* Each bulb brightens in turn (delays set per bulb) so light runs around the sign */
+  @keyframes chase {
+    0%, 100% { opacity: 0.4; box-shadow: 0 0 5px 1px rgba(255, 200, 87, 0.4); }
+    8% { opacity: 1; box-shadow: 0 0 12px 4px rgba(255, 214, 120, 0.95); }
+    22% { opacity: 0.4; box-shadow: 0 0 5px 1px rgba(255, 200, 87, 0.4); }
+  }
+
+  /* ---------- Ticket stub: paper with notches cut out of the sides ---------- */
+  .ticket-stub {
+    --notch-y: var(--stub-split, 62%);
+    -webkit-mask-image:
+      radial-gradient(circle at 0 var(--notch-y), transparent 14px, #000 14.5px),
+      radial-gradient(circle at 100% var(--notch-y), transparent 14px, #000 14.5px);
+    -webkit-mask-size: 51% 100%;
+    -webkit-mask-position: left top, right top;
+    -webkit-mask-repeat: no-repeat;
+    mask-image:
+      radial-gradient(circle at 0 var(--notch-y), transparent 14px, #000 14.5px),
+      radial-gradient(circle at 100% var(--notch-y), transparent 14px, #000 14.5px);
+    mask-size: 51% 100%;
+    mask-position: left top, right top;
+    mask-repeat: no-repeat;
+  }
+
+  .perforation {
+    background-image: radial-gradient(circle, currentColor 1.4px, transparent 1.8px);
+    background-size: 10px 4px;
+    background-repeat: repeat-x;
+    height: 4px;
+  }
+
+  /* ---------- Loading placeholders ---------- */
+  .skeleton {
+    background: linear-gradient(90deg, #1b152e 0%, #292141 40%, #1b152e 80%) 0 0 / 800px 100%;
+    @apply animate-shimmer rounded-xl;
+  }
+
+  /* ---------- Generated gig poster for an event ---------- */
+  .poster-grain {
+    background-image:
+      radial-gradient(rgba(255, 255, 255, 0.06) 1px, transparent 1px),
+      radial-gradient(rgba(0, 0, 0, 0.25) 1px, transparent 1px);
+    background-size: 3px 3px, 5px 5px;
+    background-position: 0 0, 1px 2px;
   }
 }
 
@@ -31,7 +129,19 @@
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Hide scrollbars on swipe rows but keep them scrollable */
 .overflow-x-auto {
   scrollbar-width: thin;
+  scrollbar-color: #3b3257 transparent;
+}
+
+/* Motion is decoration here: switch it off for people who ask */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
