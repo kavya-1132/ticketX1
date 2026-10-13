@@ -48,7 +48,7 @@ export default function EventsList() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-8">
+    <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-5 sm:py-10 space-y-5 sm:space-y-8">
       {/* Page Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
@@ -56,37 +56,37 @@ export default function EventsList() {
             <Sparkles className="w-3.5 h-3.5" />
             <span>Live seat maps</span>
           </div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-            Discover Events & Screenings
+          <h1 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
+            Events & screenings
           </h1>
           <p className="text-sm text-slate-400 mt-1">
-            Real-time seat contention for sold-out concerts and cinema premieres.
+            Pick your exact seat on a live map.
           </p>
         </div>
 
         {/* Filter Bar */}
-        <form onSubmit={handleSearchSubmit} className="flex flex-wrap items-center gap-2">
+        <form onSubmit={handleSearchSubmit} className="grid grid-cols-[1fr_1fr_auto] md:flex md:flex-wrap items-center gap-2 w-full md:w-auto">
           {/* Search Box */}
-          <div className="relative min-w-[200px]">
+          <div className="relative min-w-0 md:min-w-[200px]">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Search title..."
+              placeholder="Search"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-base md:text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             />
           </div>
 
           {/* City Filter */}
-          <div className="relative min-w-[140px]">
+          <div className="relative min-w-0 md:min-w-[140px]">
             <MapPin className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
-              placeholder="Filter by city..."
+              placeholder="City"
               value={cityFilter}
               onChange={(e) => setCityFilter(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+              className="w-full pl-9 pr-3 py-2 bg-slate-900 border border-slate-700/80 rounded-xl text-base md:text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
             />
           </div>
 
@@ -100,7 +100,7 @@ export default function EventsList() {
       </div>
 
       {/* Type Toggle Pills */}
-      <div className="flex items-center gap-2 border-b border-slate-800 pb-4">
+      <div className="flex items-center gap-2 border-b border-slate-800 pb-4 overflow-x-auto -mx-3 px-3 sm:mx-0 sm:px-0">
         <button
           onClick={() => setSelectedType('')}
           className={`px-4 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
@@ -163,7 +163,7 @@ export default function EventsList() {
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {events.map((ev) => {
             const dateStr = new Date(ev.startsAt).toLocaleDateString(undefined, {
               weekday: 'short',
@@ -187,7 +187,7 @@ export default function EventsList() {
                 <div>
                   {/* Banner / Poster Header */}
                   <div
-                    className={`h-40 p-5 flex flex-col justify-between relative overflow-hidden ${
+                    className={`h-28 sm:h-40 p-4 sm:p-5 flex flex-col justify-between relative overflow-hidden ${
                       isMovie
                         ? 'bg-gradient-to-br from-indigo-900/60 via-slate-900 to-slate-950'
                         : 'bg-gradient-to-br from-violet-900/60 via-slate-900 to-slate-950'
@@ -219,7 +219,7 @@ export default function EventsList() {
                   </div>
 
                   {/* Body Info */}
-                  <div className="p-6 space-y-4">
+                  <div className="p-4 sm:p-6 space-y-3 sm:space-y-4">
                     <div>
                       <h2 className="text-lg font-bold text-white group-hover:text-indigo-300 transition leading-snug">
                         {ev.title}
@@ -246,8 +246,8 @@ export default function EventsList() {
                         <span className="text-slate-400 block text-[10px] uppercase font-semibold">
                           Availability
                         </span>
-                        <span className="font-extrabold text-emerald-400">
-                          {ev.availableSeats ?? 0} seats left
+                        <span className={`font-extrabold ${(ev.availableSeats ?? 0) === 0 ? 'text-rose-300' : 'text-emerald-400'}`}>
+                          {(ev.availableSeats ?? 0) === 0 ? 'Sold out' : `${ev.availableSeats} seats left`}
                         </span>
                       </div>
                       <div className="text-right">
@@ -263,12 +263,12 @@ export default function EventsList() {
                 </div>
 
                 {/* Footer Action */}
-                <div className="p-6 pt-0">
+                <div className="p-4 sm:p-6 pt-0 sm:pt-0">
                   <Link
                     to={`/events/${ev.id}`}
-                    className="w-full py-3 px-4 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 group-hover:shadow-indigo-600/40 transition active:scale-95"
+                    className="w-full py-3 px-4 bg-gradient-to-r from-indigo-600 to-violet-600 hover:from-indigo-500 hover:to-violet-500 text-white font-bold rounded-xl text-sm flex items-center justify-center gap-2 shadow-lg shadow-indigo-600/20 group-hover:shadow-indigo-600/40 transition active:scale-95"
                   >
-                    <span>Select Seats</span>
+                    <span>{(ev.availableSeats ?? 0) === 0 ? 'Join waitlist' : 'Pick seats'}</span>
                     <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
                   </Link>
                 </div>

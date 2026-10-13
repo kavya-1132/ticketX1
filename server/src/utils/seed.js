@@ -59,7 +59,7 @@ const SEED_USERS = [
     isBlocked: false,
   },
   {
-    name: 'Diana Prince',
+    name: 'Diana Patel',
     email: 'diana@ticketx.com',
     password: 'Password123!',
     role: 'customer',
@@ -117,9 +117,9 @@ async function seedUsers() {
     const cinemaOrg = insertedUsers.find((u) => u.email === 'cinema@ticketx.com');
     const concertOrg = insertedUsers.find((u) => u.email === 'concerts@ticketx.com');
 
-    // 1. Venue 1 (IMAX, 250 seats: 10 rows x 25 seats)
+    // 1. Venue 1 (cinema, 250 seats: 10 rows x 25 seats)
     const venue1 = await Venue.create({
-      name: 'Grand IMAX Theatre',
+      name: 'Grand Horizon Cinema',
       city: 'Los Angeles',
       layout: {
         rows: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J'],
@@ -129,7 +129,7 @@ async function seedUsers() {
 
     // 2. Venue 2 (Arena, 240 seats: 12 rows x 20 seats)
     const venue2 = await Venue.create({
-      name: 'Wembley Grand Arena',
+      name: 'Riverside Grand Arena',
       city: 'London',
       layout: {
         rows: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L'],
@@ -139,7 +139,7 @@ async function seedUsers() {
 
     // 3. Venue 3 (Symphony Hall, 220 seats: 11 rows x 20 seats)
     const venue3 = await Venue.create({
-      name: 'Metropolitan Opera & Symphony Hall',
+      name: 'Metro Symphony Hall',
       city: 'New York',
       layout: {
         rows: ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K'],
@@ -149,7 +149,7 @@ async function seedUsers() {
 
     // Seed Event 1 (Movie, 250 seats)
     const event1 = await Event.create({
-      title: 'Interstellar: 10th Anniversary IMAX 70mm',
+      title: 'Starfall: 70mm Anniversary Screening',
       type: 'movie',
       venueId: venue1._id,
       organiserId: cinemaOrg._id,
@@ -159,14 +159,14 @@ async function seedUsers() {
         Premium: 25,
         General: 18,
       },
-      description: 'Experience Christopher Nolan’s space masterpiece presented in glorious IMAX 70mm film.',
+      description: 'A space epic back on the big screen in glorious 70mm, with a remastered soundtrack.',
       status: 'published',
     });
     const seats1 = await generateSeatsForEvent(event1, venue1);
 
     // Seed Event 2 (Concert, 240 seats)
     const event2 = await Event.create({
-      title: 'Coldplay: Music of the Spheres World Tour',
+      title: 'Neon Skies: World Tour Live',
       type: 'concert',
       venueId: venue2._id,
       organiserId: concertOrg._id,
@@ -176,14 +176,14 @@ async function seedUsers() {
         Premium: 140,
         General: 85,
       },
-      description: 'The record-breaking stadium show featuring dazzling LED wristbands and stadium anthems.',
+      description: 'A stadium-sized night of anthems, light shows and confetti from an award-winning live band.',
       status: 'published',
     });
     const seats2 = await generateSeatsForEvent(event2, venue2);
 
     // Seed Event 3 (Concert, 220 seats)
     const event3 = await Event.create({
-      title: 'Hans Zimmer: The Symphonic Odyssey Live',
+      title: 'Symphonic Odyssey: Film Scores Live',
       type: 'concert',
       venueId: venue3._id,
       organiserId: concertOrg._id,
@@ -193,7 +193,7 @@ async function seedUsers() {
         Premium: 120,
         General: 75,
       },
-      description: 'Iconic film scores from Dune, Inception, Gladiator, and The Dark Knight performed with a full orchestra.',
+      description: 'Epic film and game soundtracks performed live by a full orchestra and choir.',
       status: 'published',
     });
     const seats3 = await generateSeatsForEvent(event3, venue3);
@@ -248,6 +248,11 @@ async function seedUsers() {
     // eslint-disable-next-line no-console
     console.log(`  4. "${soldOut.title}" (${soldOutSeats.length} seats, all booked by Bob + Charlie)`);
 
+    // Record which version of the demo data this database holds
+    await mongoose.connection.db
+      .collection('meta')
+      .updateOne({ _id: 'seed' }, { $set: { version: SEED_VERSION, seededAt: new Date() } }, { upsert: true });
+
     // eslint-disable-next-line no-console
     console.log('\nSeeding complete.');
     return {
@@ -270,4 +275,7 @@ if (require.main === module) {
   seedUsers().then(() => process.exit(0));
 }
 
-module.exports = { seedUsers, SEED_USERS };
+// Bump when the demo data changes, so a live demo reseeds on its next start
+const SEED_VERSION = '2026-10-13-fictional-events';
+
+module.exports = { seedUsers, SEED_USERS, SEED_VERSION };

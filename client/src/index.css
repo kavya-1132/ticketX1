@@ -17,3 +17,21 @@
 .animate-shake {
   animation: shake 0.3s ease-in-out;
 }
+
+/* Phones: 16px inputs stop iOS from zooming in on focus; no blue tap flash */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Hide scrollbars on swipe rows but keep them scrollable */
+.overflow-x-auto {
+  scrollbar-width: thin;
+}

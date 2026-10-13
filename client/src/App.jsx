@@ -33,7 +33,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
-        <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100">
+        <div className="min-h-screen flex flex-col bg-slate-950 text-slate-100 pb-16 md:pb-0">
           <Navbar />
           <main className="flex-1">
             <Routes>
@@ -70,7 +70,7 @@ export default function App() {
             </Routes>
           </main>
           <footer className="border-t border-slate-900 bg-slate-950/60 py-6 text-center text-xs text-slate-500">
-            TicketX &copy; 2026. High-concurrency ticketing engine.
+            TicketX &copy; 2026 · Concert & cinema tickets
           </footer>
         </div>
       </BrowserRouter>

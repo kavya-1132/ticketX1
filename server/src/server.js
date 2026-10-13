@@ -48,6 +48,18 @@ async function prepareDemoData() {
   }
 
   if (demoMode) {
+    // eslint-disable-next-line global-require
+    const mongoose = require('mongoose');
+    // eslint-disable-next-line global-require
+    const { SEED_VERSION } = require('./utils/seed');
+    const meta = await mongoose.connection.db.collection('meta').findOne({ _id: 'seed' });
+    if (!meta || meta.version !== SEED_VERSION) {
+      // eslint-disable-next-line no-console
+      console.log('[Demo] Demo data changed in this release, reseeding');
+      await seedUsers();
+      return;
+    }
+
     const resetMs = Number(process.env.DEMO_RESET_HOURS || 24) * 60 * 60 * 1000;
     const ageMs = Date.now() - new Date(admin.createdAt).getTime();
     if (ageMs > resetMs) {
