@@ -14,7 +14,7 @@ const MAX_FIT = 34; // largest seat when the whole hall fits
  *   with a toggle to see the whole hall at once.
  * - Rows are grouped by section with the section's price, so it's clear what each area costs.
  */
-export default function SeatMap({ seats, userId, busySeatId, onSeatClick, stageLabel, priceBySection }) {
+export default function SeatMap({ seats, userId, busySeatId, onSeatClick, stageLabel, priceBySection, focusSeatIds = [] }) {
   const wrapRef = useRef(null);
   const scrollRef = useRef(null);
   const [width, setWidth] = useState(0);
@@ -87,6 +87,13 @@ export default function SeatMap({ seats, userId, busySeatId, onSeatClick, stageL
   const gap = isZoomed ? 5 : fitGap;
   const showNumbers = size >= 22;
   const rowWidth = maxPerRow * size + (maxPerRow - 1) * gap;
+
+  // Bring seats picked by "Find best seats" into view (sideways inside the map, and on the page)
+  useEffect(() => {
+    if (!focusSeatIds.length || !scrollRef.current) return;
+    const first = scrollRef.current.querySelector(`[data-seat-id="${focusSeatIds[0]}"]`);
+    if (first) first.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+  }, [focusSeatIds]);
 
   // When zoomed in, start the view in the middle of the hall (best seats)
   useEffect(() => {
@@ -177,6 +184,7 @@ export default function SeatMap({ seats, userId, busySeatId, onSeatClick, stageL
                     return (
                       <button
                         key={seatId}
+                        data-seat-id={seatId}
                         type="button"
                         disabled={booked || heldOther || busy}
                         onClick={() => onSeatClick(seat)}

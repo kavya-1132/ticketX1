@@ -18,5 +18,11 @@ router.post('/confirm', auth, validate(confirmBookingValidation), bookingControl
 router.get('/my', auth, bookingController.getMyBookings);
 router.get('/:id', auth, validate(bookingIdValidation), bookingController.getBookingById);
 router.post('/:id/cancel', auth, validate(bookingIdValidation), bookingController.cancelBooking);
+router.post(
+  '/:id/transfer',
+  auth,
+  validate([...bookingIdValidation, body('email').isEmail().withMessage("Enter your friend's email address")]),
+  bookingController.transferBooking
+);
 
 module.exports = router;

@@ -119,7 +119,38 @@ async function sendWaitlistOfferEmail({ to, userName, eventTitle, eventId, seat,
   );
 }
 
+/**
+ * Someone sent this customer a ticket. The QR is new; the sender's copy no longer works.
+ */
+async function sendTicketTransferEmail({ to, userName, fromName, eventTitle, seats, qrPng, bookingId }) {
+  const seatLabels = seats.map((s) => `Row ${esc(s.row)}, Seat ${esc(s.number)}`).join('<br/>');
+  const html = `
+    <div style="font-family: Arial, sans-serif; background:#0f172a; color:#f8fafc; padding:24px; border-radius:12px; max-width:600px; margin:0 auto;">
+      <h1 style="color:#ffc857; margin:0 0 8px;">${esc(fromName)} sent you a ticket</h1>
+      <p>Hi <strong>${esc(userName)}</strong>, you're going to <strong>${esc(eventTitle)}</strong>.</p>
+      <div style="background:#1e293b; padding:16px; border-radius:8px; margin:16px 0;">
+        <p style="margin:4px 0;"><strong>Seats:</strong><br/>${seatLabels}</p>
+        <p style="margin:4px 0;"><strong>Booking ID:</strong> ${esc(bookingId)}</p>
+      </div>
+      <div style="text-align:center; margin:24px 0;">
+        <img src="cid:ticket-qr" alt="Ticket QR code" width="220" height="220" style="background:#fff; border-radius:8px;" />
+      </div>
+      <p style="text-align:center;"><a href="${CLIENT_URL()}/my-tickets" style="color:#a5b4fc;">View in My Tickets</a></p>
+    </div>`;
+  return send(
+    {
+      from: '"TicketX" <no-reply@ticketx.com>',
+      to,
+      subject: `${fromName} sent you a ticket: ${eventTitle}`,
+      html,
+      attachments: qrPng ? [{ filename: 'ticket-qr.png', content: qrPng, cid: 'ticket-qr' }] : [],
+    },
+    'Ticket transfer'
+  );
+}
+
 module.exports = {
   sendTicketConfirmationEmail,
   sendWaitlistOfferEmail,
+  sendTicketTransferEmail,
 };

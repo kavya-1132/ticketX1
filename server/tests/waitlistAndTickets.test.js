@@ -141,6 +141,62 @@ describe('Phases 4-5: cancellation, FIFO waitlist and QR tickets', () => {
     });
   });
 
+  describe('Sending a ticket to a friend', () => {
+    it('moves the ticket, issues a new QR and the old QR stops working', async () => {
+      const booking = await holdAndBook(tokens.owner, [seats[0]]);
+      const { qrToken: oldToken } = await Booking.findById(booking.id);
+
+      const res = await request(app)
+        .post(`/api/bookings/${booking.id}/transfer`)
+        .set(auth(tokens.owner))
+        .send({ email: 'w1@t.com' });
+      expect(res.status).toBe(200);
+
+      const moved = await Booking.findById(booking.id);
+      expect(moved.userId.toString()).toBe(customers[1]._id.toString());
+      expect(moved.qrToken).not.toBe(oldToken);
+      expect(moved.transferredFrom.map(String)).toEqual([customers[0]._id.toString()]);
+
+      // Sender no longer has it; recipient does
+      const senderList = await request(app).get('/api/bookings/my').set(auth(tokens.owner));
+      expect(senderList.body.bookings).toHaveLength(0);
+      const recipientList = await request(app).get('/api/bookings/my').set(auth(tokens.w1));
+      expect(recipientList.body.bookings).toHaveLength(1);
+
+      // The old QR is rejected at the gate, the new one is admitted
+      const oldScan = await request(app).post('/api/tickets/verify').set(auth(tokens.organiser)).send({ qrToken: oldToken });
+      expect(oldScan.status).toBe(404);
+      const newScan = await request(app).post('/api/tickets/verify').set(auth(tokens.organiser)).send({ qrToken: moved.qrToken });
+      expect(newScan.status).toBe(200);
+    });
+
+    it('rejects sending to yourself, to unknown emails, and tickets that were already used', async () => {
+      const booking = await holdAndBook(tokens.owner, [seats[0]]);
+      const self = await request(app).post(`/api/bookings/${booking.id}/transfer`).set(auth(tokens.owner)).send({ email: 'owner@t.com' });
+      expect(self.status).toBe(400);
+      const unknown = await request(app).post(`/api/bookings/${booking.id}/transfer`).set(auth(tokens.owner)).send({ email: 'nobody@t.com' });
+      expect(unknown.status).toBe(404);
+      const organiserTarget = await request(app).post(`/api/bookings/${booking.id}/transfer`).set(auth(tokens.owner)).send({ email: 'org@t.com' });
+      expect(organiserTarget.status).toBe(400);
+
+      await Booking.updateOne({ _id: booking.id }, { checkedInAt: new Date() });
+      const used = await request(app).post(`/api/bookings/${booking.id}/transfer`).set(auth(tokens.owner)).send({ email: 'w1@t.com' });
+      expect(used.status).toBe(409);
+    });
+
+    it('only the owner can send it, and two simultaneous sends succeed once', async () => {
+      const booking = await holdAndBook(tokens.owner, [seats[0]]);
+      const stranger = await request(app).post(`/api/bookings/${booking.id}/transfer`).set(auth(tokens.w1)).send({ email: 'w2@t.com' });
+      expect(stranger.status).toBe(404);
+
+      const [a, b] = await Promise.all([
+        request(app).post(`/api/bookings/${booking.id}/transfer`).set(auth(tokens.owner)).send({ email: 'w1@t.com' }),
+        request(app).post(`/api/bookings/${booking.id}/transfer`).set(auth(tokens.owner)).send({ email: 'w2@t.com' }),
+      ]);
+      expect([a.status, b.status].sort()).toEqual([200, 409]);
+    });
+  });
+
   describe('Cancellation', () => {
     it('cancelling with nobody waiting puts the seats back on sale', async () => {
       const booking = await holdAndBook(tokens.owner, [seats[0], seats[1]]);

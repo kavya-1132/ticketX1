@@ -8,6 +8,8 @@ import SeatMap from '../components/SeatMap';
 import EventPoster from '../components/EventPoster';
 import TicketStub from '../components/TicketStub';
 import CountdownRing from '../components/CountdownRing';
+import { findBestSeats } from '../utils/bestSeats';
+import { downloadCalendarFile, shareLink } from '../utils/calendar';
 import {
   Calendar,
   MapPin,
@@ -21,6 +23,11 @@ import {
   ArrowLeft,
   Users,
   Hourglass,
+  Sparkles as Wand,
+  Minus,
+  Plus,
+  CalendarPlus,
+  Share2,
 } from 'lucide-react';
 
 const SOCKET_URL = import.meta.env.VITE_API_URL ?? (import.meta.env.DEV ? 'http://localhost:5000' : '');
@@ -44,6 +51,15 @@ export default function EventDetails() {
   // Waitlist state for this event (customers only)
   const [waitlistEntry, setWaitlistEntry] = useState(null);
   const [waitlistBusy, setWaitlistBusy] = useState(false);
+
+  // "Find me seats"
+  const [findCount, setFindCount] = useState(2);
+  const [findSection, setFindSection] = useState('');
+  const [finding, setFinding] = useState(false);
+  const [focusSeatIds, setFocusSeatIds] = useState([]);
+
+  // How many people have this event open right now (from Socket.IO room size)
+  const [viewers, setViewers] = useState(0);
   const isCustomer = user?.role === 'customer';
 
   const loadWaitlist = async () => {
@@ -96,6 +112,10 @@ export default function EventDetails() {
     socket.emit('join:event', eventId);
 
     // Live update when any user holds a seat
+    socket.on('viewers:count', (data) => {
+      if (data.eventId === eventId) setViewers(data.count);
+    });
+
     socket.on('seat:held', (data) => {
       const me = user?.id || user?._id;
       if (me && data.heldBy === me) {
@@ -258,6 +278,69 @@ export default function EventDetails() {
   };
 
   // Mocked Checkout Payment Confirmation (MongoDB Transaction)
+  /**
+   * Hold the best block of seats together in one tap. Each seat is still claimed with the normal
+   * atomic hold; if someone grabs one mid-way, the seats held so far are released and the next
+   * best block is tried.
+   */
+  const handleFindSeats = async () => {
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: { pathname: `/events/${eventId}` } } });
+      return;
+    }
+    const me = user?.id || user?._id;
+    const alreadyHeld = myHeldSeats.length;
+    if (alreadyHeld + findCount > 6) {
+      setErrorMsg(`You can hold up to 6 seats. You already have ${alreadyHeld}.`);
+      return;
+    }
+
+    setFinding(true);
+    setErrorMsg('');
+    let view = seats;
+    try {
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const [best] = findBestSeats(view, findCount, { section: findSection || null, eventType: event.type });
+        if (!best) {
+          setErrorMsg(
+            findSection
+              ? `There aren't ${findCount} seats together left in ${findSection}. Try another section or fewer seats.`
+              : `There aren't ${findCount} seats together left. Try fewer seats.`
+          );
+          return;
+        }
+
+        const held = [];
+        let lost = null;
+        for (const seat of best) {
+          const id = seat.id || seat._id;
+          try {
+            const res = await holdSeat(id, eventId);
+            held.push({ ...seat, status: 'held', heldBy: me, holdUntil: res.seat.holdUntil });
+          } catch (err) {
+            lost = id;
+            break;
+          }
+        }
+
+        if (!lost) {
+          const byId = new Map(held.map((h) => [h.id || h._id, h]));
+          setSeats((prev) => prev.map((s) => byId.get(s.id || s._id) || s));
+          setFocusSeatIds([...byId.keys()]);
+          return;
+        }
+
+        // Someone beat us to one seat: give back what we took and try the next best block
+        await Promise.all(held.map((h) => releaseSeat(h.id || h._id, eventId).catch(() => {})));
+        view = view.map((s) => ((s.id || s._id) === lost ? { ...s, status: 'held', heldBy: 'someone' } : s));
+      }
+      setErrorMsg('Seats are going fast right now. Please try again.');
+      loadData();
+    } finally {
+      setFinding(false);
+    }
+  };
+
   const handlePayAndConfirm = async () => {
     if (myHeldSeats.length === 0) return;
     setConfirmingPayment(true);
@@ -401,6 +484,15 @@ export default function EventDetails() {
               >
                 {seatsLeft === 0 ? 'Sold out' : seatsLeft < 20 ? `Only ${seatsLeft} seats left` : `${seatsLeft} seats available`}
               </p>
+              {viewers > 1 && (
+                <p className="text-sm text-slate-300 flex items-center gap-2 animate-toast-in" aria-live="polite">
+                  <span className="relative flex w-2.5 h-2.5">
+                    <span className="absolute inset-0 rounded-full bg-indigo-400 animate-ping opacity-75" />
+                    <span className="relative w-2.5 h-2.5 rounded-full bg-indigo-500" />
+                  </span>
+                  {viewers - 1 === 1 ? '1 other person is' : `${viewers - 1} other people are`} looking at this event right now
+                </p>
+              )}
               <h1 className="text-[2rem] sm:text-5xl font-black uppercase text-white leading-[0.92]" style={{ textWrap: 'balance' }}>
                 {event.title}
               </h1>
@@ -471,6 +563,35 @@ export default function EventDetails() {
                 Book more seats
               </button>
             </div>
+            <div className="flex gap-4 pt-1 text-sm">
+              <button
+                type="button"
+                onClick={() =>
+                  downloadCalendarFile({
+                    id: bookingSuccess.id,
+                    title: event.title,
+                    startsAt: event.startsAt,
+                    location: event.venueId ? `${event.venueId.name}, ${event.venueId.city}` : '',
+                    seats: (bookingSuccess.seatsDetail || []).map((s) => `${s.row}${s.number}`).join(', '),
+                    url: window.location.href,
+                  })
+                }
+                className="flex items-center gap-1.5 text-marquee-300 hover:text-marquee-200 font-semibold"
+              >
+                <CalendarPlus className="w-4 h-4" />
+                Add to calendar
+              </button>
+              <button
+                type="button"
+                onClick={() =>
+                  shareLink({ title: event.title, text: `I'm going to ${event.title}! Grab a seat near me.`, url: window.location.href })
+                }
+                className="flex items-center gap-1.5 text-marquee-300 hover:text-marquee-200 font-semibold"
+              >
+                <Share2 className="w-4 h-4" />
+                Tell friends
+              </button>
+            </div>
           </div>
           <div className="order-1 md:order-2 max-w-sm w-full mx-auto">
             {/* The slot */}
@@ -511,10 +632,64 @@ export default function EventDetails() {
             </span>
           </div>
 
-          {myHeldSeats.length === 0 && seatsLeft > 0 && (
-            <p className="text-center text-xs sm:text-sm text-slate-400 mb-4">
-              Tap a green seat to save it for 10 minutes. You can pick up to 6.
-            </p>
+          {seatsLeft > 0 && (
+            <div className="mb-5 p-3 sm:p-4 rounded-2xl bg-slate-950/60 ring-1 ring-slate-800 space-y-3">
+              <div className="flex flex-wrap items-center gap-3 justify-between">
+                <p className="text-sm text-slate-300">
+                  {myHeldSeats.length === 0 ? 'Tap seats on the map, or let us pick the best ones together.' : 'Need more? Add a block of seats together.'}
+                </p>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center rounded-xl ring-1 ring-slate-700 overflow-hidden" role="group" aria-label="Number of seats">
+                    <button
+                      type="button"
+                      onClick={() => setFindCount((n) => Math.max(1, n - 1))}
+                      className="w-9 h-10 flex items-center justify-center text-slate-300 hover:bg-slate-800"
+                      aria-label="Fewer seats"
+                    >
+                      <Minus className="w-4 h-4" />
+                    </button>
+                    <span className="w-16 text-center text-sm font-bold text-white tabular-nums">
+                      {findCount} {findCount === 1 ? 'seat' : 'seats'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setFindCount((n) => Math.min(6, n + 1))}
+                      className="w-9 h-10 flex items-center justify-center text-slate-300 hover:bg-slate-800"
+                      aria-label="More seats"
+                    >
+                      <Plus className="w-4 h-4" />
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleFindSeats}
+                    disabled={finding}
+                    className="h-10 px-4 rounded-xl bg-marquee-400 hover:bg-marquee-300 text-slate-950 font-bold text-sm flex items-center gap-1.5 transition active:scale-95 disabled:opacity-60"
+                  >
+                    <Wand className={`w-4 h-4 ${finding ? 'animate-spin' : ''}`} />
+                    {finding ? 'Finding...' : 'Find best seats'}
+                  </button>
+                </div>
+              </div>
+              {Object.keys(prices).length > 1 && (
+                <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="Section">
+                  {['', ...Object.keys(prices)].map((sec) => (
+                    <button
+                      key={sec || 'any'}
+                      type="button"
+                      role="radio"
+                      aria-checked={findSection === sec}
+                      onClick={() => setFindSection(sec)}
+                      className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
+                        findSection === sec ? 'bg-slate-100 text-slate-950' : 'ring-1 ring-slate-700 text-slate-300 hover:bg-slate-800'
+                      }`}
+                    >
+                      {sec ? `${sec} $${prices[sec]}` : 'Any section'}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
 
           <SeatMap
@@ -524,6 +699,7 @@ export default function EventDetails() {
             onSeatClick={handleSeatClick}
             stageLabel={event.type === 'movie' ? 'Screen this way' : 'Stage'}
             priceBySection={prices}
+            focusSeatIds={focusSeatIds}
           />
         </div>
 

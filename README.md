@@ -18,6 +18,11 @@ TicketX is a full-stack ticket booking platform for movies and concerts. It is b
 | Waitlist | When an event is sold out, customers join a **FIFO waitlist**. A cancelled seat is held for the next person for **15 minutes** and they're emailed. If they don't book, it moves to the next person. |
 | Tickets | Each booking gets a **QR code** (random 128-bit token), shown in *My Tickets* and emailed. |
 | Gate check-in | Organisers verify QR codes at the entrance. Each ticket is admitted **exactly once**, even if scanned at two gates at the same moment. |
+| Find best seats | Choose how many seats (and optionally a section); TicketX holds the best block together in one tap: centred, about two-thirds back for films, front for concerts. If someone grabs one mid-way, it releases what it took and tries the next best block. |
+| Live viewers | "3 other people are looking at this event right now", from the Socket.IO room size. |
+| Send to a friend | Transfer a ticket to another customer by email. One atomic update moves it and issues a new QR code, so the old one stops working at the gate. |
+| Calendar and share | Download a calendar file with a 2-hour reminder; share the event with the phone's share sheet. |
+| Camera check-in | Organisers scan tickets with their phone camera (browser QR detector, no app), a USB scanner, or by typing the code. |
 | Dashboards | Organisers see sold / held / revenue / occupancy / waitlist / check-ins per event and every booking. Admins see platform revenue, top events and user management. |
 
 ---
@@ -185,6 +190,7 @@ Seeded events: three large events (200+ seats each) and **"Sold-Out Jazz Night (
 | POST | `/api/bookings/confirm` | customer | Pay for held seats (transaction) |
 | GET | `/api/bookings/my` · `/api/bookings/:id` | owner | Tickets with QR codes |
 | POST | `/api/bookings/:id/cancel` | owner | Cancel; seats go to waitlist |
+| POST | `/api/bookings/:id/transfer` | owner | Send the ticket to another customer (`{ email }`); new QR issued |
 | GET | `/api/waitlist/my` | customer | My queue positions and offers |
 | POST / DELETE | `/api/waitlist/:eventId/join` · `/api/waitlist/:eventId` | customer | Join (only when sold out) / leave |
 | POST | `/api/tickets/verify` | organiser (own events), admin | Check a QR code in, once |
@@ -208,7 +214,7 @@ Jest + Supertest run against an in-memory MongoDB **replica set** (`mongodb-memo
 | --- | --- |
 | `race.test.js` | **50 users hold the same seat at once, 20 rounds:** exactly 1× `200`, 49× `409`, one holder in the database every round |
 | `eventsAndSeats.test.js` | Seat generation, hold/release, multi-seat transaction rollback, expiry job |
-| `waitlistAndTickets.test.js` | QR tickets, one-time check-in (incl. 10 simultaneous scans), cancellation (incl. 10 simultaneous cancels), FIFO waitlist, offer expiry hand-off, leaving with an offer, 3 overlapping expiry jobs |
+| `waitlistAndTickets.test.js` | Ticket transfer (old QR rejected, simultaneous sends), QR tickets, one-time check-in (incl. 10 simultaneous scans), cancellation (incl. 10 simultaneous cancels), FIFO waitlist, offer expiry hand-off, leaving with an offer, 3 overlapping expiry jobs |
 | `auth.test.js` | Registration, validation, login, blocked users, role checks |
 | `seed.test.js` | Seed data, including the sold-out demo event |
 

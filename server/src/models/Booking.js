@@ -45,6 +45,13 @@ const bookingSchema = new mongoose.Schema({
     type: Date,
     default: null,
   },
+  // Previous owners, oldest first (filled when a ticket is sent to someone else)
+  transferredFrom: [
+    {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+    },
+  ],
   // Set after a cancelled booking's seats have been handed to the waitlist / put back on sale.
   // The expiry job retries any cancellation where this is still null (e.g. server crashed mid-way).
   seatsReleasedAt: {

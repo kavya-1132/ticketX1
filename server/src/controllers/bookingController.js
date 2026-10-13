@@ -4,7 +4,8 @@ const Booking = require('../models/Booking');
 const Event = require('../models/Event');
 const { emitSeatBooked } = require('../sockets/seatSocket');
 const { generateQrToken, qrDataUrl, qrPngBuffer } = require('../services/qrService');
-const { sendTicketConfirmationEmail } = require('../services/emailService');
+const { sendTicketConfirmationEmail, sendTicketTransferEmail } = require('../services/emailService');
+const User = require('../models/User');
 const { markOffersAccepted, releaseCancelledSeats } = require('../services/waitlistService');
 
 /**
@@ -238,9 +239,80 @@ async function cancelBooking(req, res, next) {
   }
 }
 
+/**
+ * Send a ticket to a friend
+ * POST /api/bookings/:id/transfer   { email }
+ *
+ * One atomic update moves the booking to the recipient AND issues a new QR token, conditioned
+ * on the booking still belonging to the sender, being confirmed and not yet scanned. So:
+ *  - the sender's old QR code stops working the moment the transfer happens,
+ *  - two transfers (or a transfer and a gate scan) racing each other can't both win.
+ */
+async function transferBooking(req, res, next) {
+  try {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const sender = req.user;
+
+    if (email === sender.email.toLowerCase()) {
+      return res.status(400).json({ error: "You can't send a ticket to yourself" });
+    }
+
+    const recipient = await User.findOne({ email });
+    if (!recipient || recipient.isBlocked) {
+      return res.status(404).json({ error: 'No TicketX customer has that email. Ask your friend to sign up first.' });
+    }
+    if (recipient.role !== 'customer') {
+      return res.status(400).json({ error: 'Tickets can only be sent to customer accounts' });
+    }
+
+    const booking = await Booking.findOne({ _id: req.params.id, userId: sender._id });
+    if (!booking) return res.status(404).json({ error: 'Booking not found' });
+
+    const event = await Event.findById(booking.eventId);
+    if (event && new Date(event.startsAt) <= new Date()) {
+      return res.status(400).json({ error: 'This event has already started' });
+    }
+
+    const newToken = generateQrToken();
+    const moved = await Booking.findOneAndUpdate(
+      { _id: booking._id, userId: sender._id, status: 'confirmed', checkedInAt: null },
+      { $set: { userId: recipient._id, qrToken: newToken }, $push: { transferredFrom: sender._id } },
+      { new: true }
+    ).populate('seatIds', 'row number section');
+
+    if (!moved) {
+      return res.status(409).json({ error: 'This ticket was cancelled, used or already sent' });
+    }
+
+    (async () => {
+      const qrPng = await qrPngBuffer(newToken);
+      await sendTicketTransferEmail({
+        to: recipient.email,
+        userName: recipient.name,
+        fromName: sender.name,
+        eventTitle: event ? event.title : 'your event',
+        seats: moved.seatIds,
+        qrPng,
+        bookingId: moved._id.toString(),
+      });
+    })().catch((err) => {
+      // eslint-disable-next-line no-console
+      console.warn('[Booking] transfer email failed:', err.message);
+    });
+
+    return res.status(200).json({
+      message: `Ticket sent to ${recipient.name}`,
+      recipient: { name: recipient.name, email: recipient.email },
+    });
+  } catch (error) {
+    next(error);
+  }
+}
+
 module.exports = {
   confirmBooking,
   getMyBookings,
   getBookingById,
   cancelBooking,
+  transferBooking,
 };

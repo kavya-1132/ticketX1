@@ -105,6 +105,10 @@ export default {
           from: { opacity: '0', transform: 'translateY(8px)' },
           to: { opacity: '1', transform: 'none' },
         },
+        scan: {
+          from: { top: '0%' },
+          to: { top: '100%' },
+        },
       },
       // 'backwards' = no leftover transform after an entrance, so fixed/sticky children keep working
       animation: {
@@ -117,6 +121,7 @@ export default {
         print: 'print 900ms cubic-bezier(.2,.8,.2,1) both',
         'flip-in': 'flip-in 420ms cubic-bezier(.2,.8,.2,1) backwards',
         'row-in': 'row-in 380ms ease-out backwards',
+        scan: 'scan 1.6s ease-in-out infinite alternate',
       },
     },
   },

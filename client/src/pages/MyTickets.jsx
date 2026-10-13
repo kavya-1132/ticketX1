@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Ticket, Calendar, MapPin, X, Clock, AlertCircle, CheckCircle, Hourglass, Copy } from 'lucide-react';
+import { Ticket, X, AlertCircle, CheckCircle, Hourglass, Copy, CalendarPlus, Share2, Send } from 'lucide-react';
 import TicketStub from '../components/TicketStub';
-import { getMyBookings, cancelBooking, getMyWaitlist, leaveWaitlist } from '../api/tickets';
+import { getMyBookings, cancelBooking, getMyWaitlist, leaveWaitlist, transferTicket } from '../api/tickets';
+import { downloadCalendarFile, shareLink } from '../utils/calendar';
 
 function formatWhen(date) {
   return new Date(date).toLocaleString(undefined, {
@@ -39,6 +40,128 @@ function StatusBadge({ booking }) {
     return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-slate-700 text-slate-300">Used</span>;
   }
   return <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">Confirmed</span>;
+}
+
+/** Everything you can do with an upcoming ticket. */
+function TicketActions({ booking, busy, copied, onCopy, onCancel, onSent }) {
+  const [sending, setSending] = useState(false);
+  const [email, setEmail] = useState('');
+  const [working, setWorking] = useState(false);
+  const [shared, setShared] = useState('');
+  const [formError, setFormError] = useState('');
+  const ev = booking.eventId || {};
+  const venue = ev.venueId && typeof ev.venueId === 'object' ? ev.venueId : null;
+  const eventUrl = `${window.location.origin}/events/${ev._id || ev.id || ''}`;
+  const seatText = booking.seatIds.map((s) => `${s.row}${s.number}`).join(', ');
+  const used = Boolean(booking.checkedInAt);
+
+  const addToCalendar = () =>
+    downloadCalendarFile({
+      id: booking.id,
+      title: ev.title,
+      startsAt: ev.startsAt,
+      location: venue ? `${venue.name}, ${venue.city}` : '',
+      seats: seatText,
+      url: eventUrl,
+    });
+
+  const share = async () => {
+    const result = await shareLink({
+      title: ev.title,
+      text: `I'm going to ${ev.title}! Grab a seat near me on TicketX.`,
+      url: eventUrl,
+    });
+    if (result === 'copied') {
+      setShared('Link copied');
+      setTimeout(() => setShared(''), 2000);
+    }
+  };
+
+  const send = async (e) => {
+    e.preventDefault();
+    setWorking(true);
+    setFormError('');
+    try {
+      const res = await transferTicket(booking.id, email.trim());
+      setSending(false);
+      setEmail('');
+      onSent(res.recipient?.name || email);
+    } catch (err) {
+      setFormError(err.response?.data?.error || 'Could not send this ticket. Check the email and try again.');
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const btn =
+    'flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-1.5 px-2 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition ring-1 ring-slate-800 hover:bg-slate-900 active:scale-95';
+
+  return (
+    <div className="space-y-2.5">
+      <div className="grid grid-cols-4 gap-2">
+        <button type="button" onClick={addToCalendar} className={`${btn} text-slate-200`}>
+          <CalendarPlus className="w-4 h-4 text-marquee-400" />
+          Calendar
+        </button>
+        <button type="button" onClick={share} className={`${btn} text-slate-200`}>
+          <Share2 className="w-4 h-4 text-marquee-400" />
+          {shared || 'Share'}
+        </button>
+        <button
+          type="button"
+          onClick={() => setSending((v) => !v)}
+          disabled={used}
+          className={`${btn} text-slate-200 disabled:opacity-40 ${sending ? 'bg-slate-900 ring-marquee-400/50' : ''}`}
+          aria-expanded={sending}
+        >
+          <Send className="w-4 h-4 text-marquee-400" />
+          Send
+        </button>
+        <button type="button" onClick={onCancel} disabled={busy || used} className={`${btn} text-indigo-300 disabled:opacity-40`}>
+          <X className="w-4 h-4" />
+          {busy ? 'Wait' : 'Cancel'}
+        </button>
+      </div>
+
+      {sending && (
+        <form onSubmit={send} className="p-3.5 rounded-2xl bg-slate-900 ring-1 ring-marquee-400/30 space-y-2.5 animate-toast-in">
+          <p className="text-sm text-slate-300">
+            Send this ticket to a friend who has a TicketX account. They get a new QR code and yours stops working.
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="friend@email.com"
+              className="flex-1 min-w-0 px-3 py-2.5 rounded-xl bg-slate-950 ring-1 ring-slate-700 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-marquee-400"
+            />
+            <button
+              type="submit"
+              disabled={working}
+              className="px-4 py-2.5 rounded-xl bg-marquee-400 hover:bg-marquee-300 text-slate-950 font-bold text-sm disabled:opacity-50"
+            >
+              {working ? 'Sending...' : 'Send ticket'}
+            </button>
+          </div>
+          {formError && <p className="text-sm text-indigo-300">{formError}</p>}
+        </form>
+      )}
+
+      {booking.ticketCode && !used && (
+        <button
+          type="button"
+          onClick={onCopy}
+          className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-slate-300 px-1"
+          title="For entry if the QR code can't be scanned"
+        >
+          <Copy className="w-3.5 h-3.5" />
+          {copied ? 'Ticket code copied' : 'Copy ticket code'}
+        </button>
+      )}
+    </div>
+  );
 }
 
 export default function MyTickets() {
@@ -209,30 +332,18 @@ export default function MyTickets() {
                   qrCode={b.qrCode}
                   status={b.checkedInAt ? 'used' : 'confirmed'}
                 />
-                <div className="flex items-center justify-between gap-3 px-1">
-                  {b.ticketCode ? (
-                    <button
-                      onClick={() => copyCode(b.ticketCode, b.id)}
-                      className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200"
-                      title="Copy the ticket code, for entry if the QR can't be scanned"
-                    >
-                      <Copy className="w-3.5 h-3.5" />
-                      {copied === b.id ? 'Copied' : 'Copy ticket code'}
-                    </button>
-                  ) : (
-                    <span />
-                  )}
-                  {!b.checkedInAt && (
-                    <button
-                      onClick={() => handleCancel(b)}
-                      disabled={busyId === b.id}
-                      className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm font-semibold text-indigo-300 hover:bg-indigo-500/10 transition disabled:opacity-50"
-                    >
-                      <X className="w-4 h-4" />
-                      {busyId === b.id ? 'Cancelling...' : 'Cancel booking'}
-                    </button>
-                  )}
-                </div>
+                <TicketActions
+                  booking={b}
+                  busy={busyId === b.id}
+                  copied={copied === b.id}
+                  onCopy={() => copyCode(b.ticketCode, b.id)}
+                  onCancel={() => handleCancel(b)}
+                  onSent={(name) => {
+                    setNotice(`Ticket sent to ${name}. Your copy no longer works.`);
+                    window.scrollTo({ top: 0, behavior: 'smooth' });
+                    load();
+                  }}
+                />
               </div>
             ))}
           </div>

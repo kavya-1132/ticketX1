@@ -15,3 +15,5 @@ export const getOrganiserEvents = async () => (await api.get('/api/organiser/eve
 export const getOrganiserEventBookings = async (eventId) =>
   (await api.get(`/api/organiser/events/${eventId}/bookings`)).data;
 export const verifyTicket = async (qrToken) => (await api.post('/api/tickets/verify', { qrToken })).data;
+export const transferTicket = async (bookingId, email) =>
+  (await api.post(`/api/bookings/${bookingId}/transfer`, { email })).data;
